@@ -1,0 +1,28 @@
+{
+  "name": "crow",
+  "version": "1.0.0",
+  "description": "small metrics collector for node",
+  "author": "Robey Pointer <robeypointer@gmail.com>",
+  "repository": {
+    "type": "git",
+    "url": "git://github.com/..."
+  },
+  "scripts": {
+    "clean": "rm -rf lib",
+    "prepublish": "6to5 --source-maps --out-dir lib src && 6to5 --source-maps --out-dir test/lib test/src",
+    "test": "mocha -R spec --colors test/lib --timeout 30000"
+  },
+  "dependencies": {
+    "bluebird": "*"
+  },
+  "devDependencies": {
+    "6to5": "*",
+    "mocha": "*",
+    "should": "*",
+    "source-map-support": "*"
+  },
+  "main": "./lib/crow",
+  "files": [
+    "lib"
+  ]
+}
