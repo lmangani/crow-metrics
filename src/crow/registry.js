@@ -3,7 +3,8 @@ let util = require("util");
 /*
  * The registry is the central coordinator for metrics collection and
  * dispersal. It tracks metrics in a single namespace, and periodically
- * takes a snapshot and sends it to any observers.
+ * takes a snapshot and sends it to any observers. (A typical observer might
+ * push the metrics into graphite or influxdb.)
  *
  * options:
  * - period: (msec) how often to send snapshots to observers
