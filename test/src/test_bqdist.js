@@ -71,5 +71,5 @@ describe("BiasedQuantileDistribution", () => {
         validate(dist, samples);
       }
     }
-  })
+  });
 });
