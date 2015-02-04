@@ -1,6 +1,7 @@
-var registry = require("../../lib/crow/registry");
-var should = require("should");
-var util = require("util");
+let Promise = require("bluebird");
+let registry = require("../../lib/crow/registry");
+let should = require("should");
+let util = require("util");
 
 require("source-map-support").install();
 
@@ -45,6 +46,19 @@ describe("Registry", () => {
       "stars{galaxy=\"1a\",quantile=\"0.5\"}": 300,
       "stars{galaxy=\"1a\",quantile=\"0.9\"}": 500,
       "stars_count{galaxy=\"1a\"}": 3
+    });
+  });
+
+  it("records times in distributions", (done) => {
+    let r = new registry.Registry();
+    let d = r.distribution("stars", {}, [ 0.5, 0.9 ]);
+    d.time(() => "hi").should.eql("hi");
+    d.time(() => Promise.delay(50).then(() => 99)).then((rv) => {
+      rv.should.eql(99);
+      let stats = d.get()
+      stats["stars_count"].should.eql(2);
+      stats["stars{quantile=\"0.5\"}"].should.be.greaterThan(49);
+      done();
     });
   });
 

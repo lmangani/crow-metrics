@@ -107,6 +107,27 @@ class Distribution {
     rv[this.registry._fullname(this.name + "_count", this.tags)] = snapshot.sampleCount;
     return rv;
   }
+
+  /*
+   * time a function call and record it (in milliseconds).
+   * if the function returns a promise, the recorded time will cover the time
+   * until the promise succeeds.
+   * exceptions (and rejected promises) are not recorded.
+   */
+  time(f) {
+    let startTime = Date.now();
+    let rv = f();
+    // you aren't going to believe this. the type of null is... "object". :(
+    if (rv != null && typeof rv === "object" && typeof rv.then === "function") {
+      return rv.then((rv2) => {
+        this.add(Date.now() - startTime);
+        return rv2;
+      })
+    } else {
+      this.add(Date.now() - startTime);
+      return rv;
+    }
+  }
 }
 
 
