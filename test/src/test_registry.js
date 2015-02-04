@@ -1,3 +1,5 @@
+"use strict";
+
 let Promise = require("bluebird");
 let registry = require("../../lib/crow/registry");
 let should = require("should");
@@ -78,6 +80,12 @@ describe("Registry", () => {
     r.setGauge("speed", 150);
     r.distribution("stars").withTags({ galaxy: "1a" }).add([ 90, 100, 110 ]);
     r.snapshot().should.eql({
+      _types: {
+        buckets: registry.MetricType.COUNTER,
+        cats: registry.MetricType.COUNTER,
+        speed: registry.MetricType.GAUGE,
+        stars: registry.MetricType.DISTRIBUTION
+      },
       "cats": 900,
       "buckets{city=\"San Jose\"}": 10,
       "buckets{contents=\"fire\"}": 3,
@@ -98,8 +106,8 @@ describe("Registry", () => {
       r.counter("buckets").increment(3);
       setTimeout(() => {
         captured.length.should.eql(2);
-        captured[0][1].should.eql({ buckets: 5 });
-        captured[1][1].should.eql({ buckets: 8 });
+        captured[0][1].should.eql({ _types: { buckets: registry.MetricType.COUNTER }, buckets: 5 });
+        captured[1][1].should.eql({ _types: { buckets: registry.MetricType.COUNTER }, buckets: 8 });
         (captured[1][0] - captured[0][0]).should.be.greaterThan(9);
         done();
       }, 11);
@@ -111,5 +119,5 @@ describe("Registry", () => {
     r.setGauge("buckets", 10);
     (() => r.counter("buckets")).should.throw("buckets is already a gauge");
     (() => r.distribution("buckets")).should.throw("buckets is already a gauge");
-  })
+  });
 });

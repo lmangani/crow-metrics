@@ -1,135 +1,12 @@
-let bqdist = require("./bqdist");
+"use strict";
+
+let metrics = require("./metrics");
 let util = require("util");
-
-/*
- * every metric has a name and tags.
- */
-
-let MetricType = {
-  GAUGE: 0,
-  COUNTER: 1,
-  DISTRIBUTION: 2
-};
-
-function _metricName(i) {
-  return Object.keys(MetricType).filter((name) => MetricType[name] == i)[0];
-}
 
 let DEFAULT_PERCENTILES = [ 0.5, 0.9, 0.99 ];
 let DEFAULT_ERROR = 0.01;
 
-class Gauge {
-  constructor(name, getter) {
-    this.name = name;
-    this.type = MetricType.GAUGE;
-    this.get = (typeof getter === "function") ? getter : (() => getter);
-  }
-}
-
-class Counter {
-  constructor(registry, name, tags = {}) {
-    this.registry = registry;
-    this.name = name;
-    this.tags = tags;
-    this.type = MetricType.COUNTER;
-    this.value = 0;
-  }
-
-  /*
-   * return a counter with the same name, but different tags.
-   * you may "remove" tags by setting them to null.
-   * this call defers to the registry, so if a counter with this tag
-   * combination already exists, that will be returned. otherwise, a new
-   * counter is created.
-   */
-  withTags(tags) {
-    return this.registry.counter(this.name, this.registry._mergeTags(this.tags, tags));
-  }
-
-  increment(count = 1, tags = {}) {
-    if (typeof count === "object") {
-      // increment(tags)
-      tags = count;
-      count = 1;
-    }
-    if (Object.keys(tags).length > 0) {
-      this.withTags(tags).increment(count);
-    } else {
-      this.value += count;
-    }
-  }
-
-  get() {
-    return this.value;
-  }
-}
-
-class Distribution {
-  constructor(registry, name, tags = {}, percentiles, error) {
-    this.registry = registry;
-    this.name = name;
-    this.tags = tags;
-    this.percentiles = percentiles;
-    this.error = error;
-    this.type = MetricType.DISTRIBUTION;
-    this.distribution = new bqdist.BiasedQuantileDistribution(this.percentiles, this.error);
-  }
-
-  /*
-   * return a distribution with the same name, but different tags.
-   * you may "remove" tags by setting them to null.
-   * this call defers to the registry, so if a distribution with this tag
-   * combination already exists, that will be returned. otherwise, a new
-   * distribution is created.
-   */
-  withTags(tags) {
-    return this.registry.distribution(this.name, this.registry._mergeTags(this.tags, tags), this.percentiles, this.error);
-  }
-
-  /*
-   * add one data point (or more, if an array) to the distribution.
-   */
-  add(data) {
-    if (Array.isArray(data)) {
-      data.forEach((x) => this.distribution.record(x));
-    } else {
-      this.distribution.record(data);
-    }
-  }
-
-  get() {
-    let snapshot = this.distribution.reset();
-    let rv = {};
-    if (snapshot.sampleCount == 0) return rv;
-    this.percentiles.forEach((p) => {
-      rv[this.registry._fullname(this.name, this.tags, { quantile: p })] = snapshot.getPercentile(p);
-    });
-    rv[this.registry._fullname(this.name + "_count", this.tags)] = snapshot.sampleCount;
-    return rv;
-  }
-
-  /*
-   * time a function call and record it (in milliseconds).
-   * if the function returns a promise, the recorded time will cover the time
-   * until the promise succeeds.
-   * exceptions (and rejected promises) are not recorded.
-   */
-  time(f) {
-    let startTime = Date.now();
-    let rv = f();
-    // you aren't going to believe this. the type of null is... "object". :(
-    if (rv != null && typeof rv === "object" && typeof rv.then === "function") {
-      return rv.then((rv2) => {
-        this.add(Date.now() - startTime);
-        return rv2;
-      })
-    } else {
-      this.add(Date.now() - startTime);
-      return rv;
-    }
-  }
-}
-
+let MetricType = metrics.MetricType;
 
 /*
  * The registry is the central coordinator for metrics collection and
@@ -145,7 +22,7 @@ class Distribution {
  */
 class Registry {
   /*
-   * each metric is stored by its fully-qualified name in `metrics`. for
+   * Each metric is stored by its fully-qualified name in `metrics`. For
    * example, a counter named "buckets" with a tag of cats="yes" is stored
    * by `buckets{cats="yes"}`.
    */
@@ -195,25 +72,26 @@ class Registry {
   }
 
   /*
-   * add an observer, which should be a function:
+   * Add an observer, which should be a function:
    *
    *     function observer(timestamp, snapshot)
    *
-   * the timestamp is in milliseconds, and the snapshot is an object with
+   * The timestamp is in milliseconds, and the snapshot is an object with
    * fully-qualified metric names as the keys, and numbers as the values.
-   * for example: `{ "requests_served": 10 }`
+   * For example: `{ "requests_served": 10 }`
    */
   addObserver(observer) {
     this.observers.push(observer);
   }
 
   /*
-   * grab a snapshot of the current value of each metric.
+   * Grab a snapshot of the current value of each metric.
    */
   snapshot() {
-    let rv = {};
+    let rv = { _types: {} };
     for (let key in this.metrics) {
       let metric = this.metrics[key];
+      rv._types[metric.name] = metric.type;
       switch (metric.type) {
         case MetricType.DISTRIBUTION:
           let stats = this.metrics[key].get();
@@ -227,16 +105,16 @@ class Registry {
   }
 
   /*
-   * fetch the counter with a given name (and optional tags).
-   * if no counter by that name/tag combination exists, it's created.
+   * Fetch the counter with a given name (and optional tags).
+   * If no counter by that name/tag combination exists, it's created.
    */
   counter(name, tags = {}) {
-    return this._getOrMake(name, tags, MetricType.COUNTER, () => new Counter(this, name, tags));
+    return this._getOrMake(name, tags, MetricType.COUNTER, () => new metrics.Counter(this, name, tags));
   }
 
   /*
-   * fetch the gauge with a given name (and optional tags).
-   * if no gauge by that name/tag combination exists, an exception is thrown.
+   * Fetch the gauge with a given name (and optional tags).
+   * If no gauge by that name/tag combination exists, an exception is thrown.
    */
   gauge(name, tags = {}) {
     return this._getOrMake(name, tags, MetricType.GAUGE, () => {
@@ -245,8 +123,8 @@ class Registry {
   }
 
   /*
-   * add (or replace) a gauge with the given name (and optional tags).
-   * the getter is normally a function that computes the value on demand,
+   * Add (or replace) a gauge with the given name (and optional tags).
+   * The getter is normally a function that computes the value on demand,
    * but if the value changes rarely or never, you may use a constant value
    * instead.
    */
@@ -256,22 +134,22 @@ class Registry {
       getter = tags;
       tags = {};
     }
-    return this._getOrMake(name, tags, MetricType.GAUGE, () => new Gauge(name, getter));
+    return this._getOrMake(name, tags, MetricType.GAUGE, () => new metrics.Gauge(name, getter));
   }
 
   /*
-   * fetch the distribution with a given name (and optional tags).
-   * if no distribution by that name/tag combination exists, it's generated.
+   * Fetch the distribution with a given name (and optional tags).
+   * If no distribution by that name/tag combination exists, it's generated.
    */
   distribution(name, tags = {}, percentiles = this.percentiles, error = this.error) {
-    return this._getOrMake(name, tags, MetricType.DISTRIBUTION, () => new Distribution(this, name, tags, percentiles, error));
+    return this._getOrMake(name, tags, MetricType.DISTRIBUTION, () => new metrics.Distribution(this, name, tags, percentiles, error));
   }
   
   _getOrMake(name, tags, type, maker) {
     let fullname = this._fullname(name, tags);
     let metric = this.metrics[fullname];
     if (metric !== undefined) {
-      if (metric.type != type) throw new Error(`${fullname} is already a ${_metricName(metric.type).toLowerCase()}`);
+      if (metric.type != type) throw new Error(`${fullname} is already a ${metrics.metricName(metric.type).toLowerCase()}`);
       return metric;
     }
     metric = maker();
@@ -303,4 +181,5 @@ class Registry {
 }
 
 
+exports.MetricType = MetricType;
 exports.Registry = Registry;
