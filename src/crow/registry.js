@@ -145,6 +145,20 @@ class Registry {
     return this._getOrMake(name, tags, MetricType.DISTRIBUTION, () => new metrics.Distribution(this, name, tags, percentiles, error));
   }
   
+  /*
+   * Return a new registry-like object that has accessors for metrics, but
+   * prefixes all names with `(prefix)_`.
+   */
+  withPrefix(prefix) {
+    return {
+      counter: (name, tags) => this.counter(`${prefix}_${name}`, tags),
+      gauge: (name, tags) => this.gauge(`${prefix}_${name}`, tags),
+      setGauge: (name, tags, getter) => this.setGauge(`${prefix}_${name}`, tags, getter),
+      distribution: (name, tags, percentiles, error) => this.distribution(`${prefix}_${name}`, tags, percentiles, error),
+      withPrefix: (nextPrefix) => this.withPrefix(`${prefix}_${nextPrefix}`)
+    };
+  }
+
   _getOrMake(name, tags, type, maker) {
     let fullname = this._fullname(name, tags);
     let metric = this.metrics[fullname];

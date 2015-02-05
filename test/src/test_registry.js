@@ -120,4 +120,22 @@ describe("Registry", () => {
     (() => r.counter("buckets")).should.throw("buckets is already a gauge");
     (() => r.distribution("buckets")).should.throw("buckets is already a gauge");
   });
+
+  it("can sub-divide by prefix", () => {
+    let r = new registry.Registry();
+    let r2 = r.withPrefix("myserver");
+    r2.setGauge("gauge", 10);
+    r2.counter("counter").increment(3);
+    r2.distribution("dist", {}, [ 0.5 ]).add(100);
+    let r3 = r2.withPrefix("moar");
+    r3.counter("wut").increment(8);
+
+    Object.keys(r.snapshot()).filter((x) => x[0] != "_").sort().should.eql([
+      "myserver_counter",
+      "myserver_dist_count",
+      "myserver_dist{quantile=\"0.5\"}",
+      "myserver_gauge",
+      "myserver_moar_wut"
+    ]);
+  })
 });

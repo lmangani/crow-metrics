@@ -2,10 +2,11 @@
   "name": "crow",
   "version": "1.0.0",
   "description": "small metrics collector for node",
+  "keywords": [ "metrics", "prometheus", "servo", "graphs" ],
   "author": "Robey Pointer <robeypointer@gmail.com>",
   "repository": {
     "type": "git",
-    "url": "git://github.com/..."
+    "url": "git@github.com:robey/node-crow.git"
   },
   "scripts": {
     "clean": "rm -rf lib",
