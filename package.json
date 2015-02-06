@@ -1,5 +1,5 @@
 {
-  "name": "crow",
+  "name": "crow-metrics",
   "version": "1.0.0",
   "description": "small metrics collector for node",
   "keywords": [ "metrics", "prometheus", "servo", "graphs" ],
