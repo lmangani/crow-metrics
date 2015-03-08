@@ -1,4 +1,4 @@
-<img src="static/crow.png" style="float: right; width: 10em">
+<img src="docs/crow-small.png" align="right">
 
 # crow
 
