@@ -8,22 +8,30 @@
     "type": "git",
     "url": "git@github.com:robey/node-crow.git"
   },
+  "licenses": [
+    {
+      "type": "Apache License 2.0",
+      "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
+    }
+  ],
   "scripts": {
     "clean": "rm -rf lib",
-    "prepublish": "6to5 --source-maps --out-dir lib src && 6to5 --source-maps --out-dir test/lib test/src",
+    "prepublish": "babel --source-maps --out-dir lib src && babel --source-maps --out-dir test/lib test/src",
     "test": "mocha -R spec --colors test/lib --timeout 30000"
   },
   "dependencies": {
     "bluebird": "*"
   },
   "devDependencies": {
-    "6to5": "*",
+    "babel": "*",
     "mocha": "*",
     "should": "*",
     "source-map-support": "*"
   },
   "main": "./lib/crow",
   "files": [
-    "lib"
+    "doc",
+    "lib",
+    "static"
   ]
 }
