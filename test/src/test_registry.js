@@ -80,7 +80,7 @@ describe("Registry", () => {
     r.setGauge("speed", 150);
     r.distribution("stars").withTags({ galaxy: "1a" }).add([ 90, 100, 110 ]);
     r.snapshot().should.eql({
-      _types: {
+      "@types": {
         buckets: registry.MetricType.COUNTER,
         cats: registry.MetricType.COUNTER,
         speed: registry.MetricType.GAUGE,
@@ -106,8 +106,8 @@ describe("Registry", () => {
       r.counter("buckets").increment(3);
       setTimeout(() => {
         captured.length.should.eql(2);
-        captured[0][1].should.eql({ _types: { buckets: registry.MetricType.COUNTER }, buckets: 5 });
-        captured[1][1].should.eql({ _types: { buckets: registry.MetricType.COUNTER }, buckets: 8 });
+        captured[0][1].should.eql({ "@types": { buckets: registry.MetricType.COUNTER }, buckets: 5 });
+        captured[1][1].should.eql({ "@types": { buckets: registry.MetricType.COUNTER }, buckets: 8 });
         (captured[1][0] - captured[0][0]).should.be.greaterThan(9);
         done();
       }, 11);
@@ -130,7 +130,7 @@ describe("Registry", () => {
     let r3 = r2.withPrefix("moar");
     r3.counter("wut").increment(8);
 
-    Object.keys(r.snapshot()).filter((x) => x[0] != "_").sort().should.eql([
+    Object.keys(r.snapshot()).filter((x) => x[0] != "@").sort().should.eql([
       "myserver_counter",
       "myserver_dist_count",
       "myserver_dist{quantile=\"0.5\"}",
