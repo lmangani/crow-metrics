@@ -1,3 +1,5 @@
+<img src="static/crow.png" style="float: right; width: 10em">
+
 # crow
 
 Crow is a library for collecting metrics about your server, similar to Twitter's Ostrich or Netflix's Servo.(*) It helps you track things like:
@@ -83,7 +85,7 @@ For local debugging, sanity checking -- or simply because it's pretty -- you may
 
 Viz attaches a `RingBufferObserver` to your registry, which collects metrics over a rolling window (one hour, by default), and graphs this data with [peity](http://benpickles.github.io/peity/).
 
-<img src="https://raw.githubusercontent.com/robey/node-crow/master/docs/crow-screenshot.png" width="20em">
+<img src="https://raw.githubusercontent.com/robey/node-crow/master/docs/crow-screenshot.png">
 
 If you want a devoted port for this service:
 
