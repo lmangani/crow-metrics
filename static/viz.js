@@ -9,7 +9,12 @@ function refresh() {
     var graphsDiv = $(".graphs");
     graphsDiv.empty();
     $.each(names, function (i, name) {
-      var currentValue = data[name][data[name].length - 1].toString().substring(0, 11);
+      var currentValue = data[name][data[name].length - 1];
+      if (currentValue) {
+        currentValue = currentValue.toString().substring(0, 11);
+      } else {
+        currentValue = "(none)";
+      }
       var graphDiv = $(".graph-template").clone();
       graphDiv.removeClass("graph-template");
       graphDiv.addClass("graph");
