@@ -76,7 +76,7 @@ function prometheusExporter(express, registry) {
   const router = express.Router();
   router.get("/", (request, response) => {
     response.set("Content-Type", "text/plain; version=0.0.4");
-    response.send(this.generate());
+    response.send(observer.generate());
   });
 
   return router;
