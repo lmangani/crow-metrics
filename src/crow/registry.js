@@ -47,7 +47,7 @@ class Registry {
 
     this._schedulePublish();
 
-    const packageInfo = require("../package.json");
+    const packageInfo = require("../../package.json");
     if (this.log) this.log.info(`crow-metrics ${packageInfo.version} started; period_sec=${this.period / 1000}`);
   }
 
