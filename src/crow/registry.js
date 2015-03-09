@@ -88,10 +88,10 @@ class Registry {
    * Grab a snapshot of the current value of each metric.
    */
   snapshot() {
-    let rv = { _types: {} };
+    let rv = { "@types": {} };
     for (let key in this.metrics) {
       let metric = this.metrics[key];
-      rv._types[metric.name] = metric.type;
+      rv["@types"][metric.name] = metric.type;
       switch (metric.type) {
         case MetricType.DISTRIBUTION:
           let stats = this.metrics[key].get();
