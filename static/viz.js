@@ -1,6 +1,6 @@
 
 function refresh() {
-  $.getJSON("metrics", function (data) {
+  $.getJSON("history.json", function (data) {
     // "@timestamp": [ t, t, t, ... ]
     // "metric_name": [ y, y, y, ... ]
 
