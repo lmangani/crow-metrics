@@ -22,7 +22,7 @@ function viz(express, registry, span = ring.DEFAULT_SPAN) {
   router.use("/", express.static(staticPath));
 
   var observer = new ring.RingBufferObserver(registry, span);
-  router.get("/metrics", (request, response) => {
+  router.get("/history.json", (request, response) => {
     response.type("json");
     response.send(observer.toJson());
   });
