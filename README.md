@@ -45,13 +45,54 @@ Metrics consist of:
 
 - counters: things that only increase, like the number of requests handled since the server started.
 - gauges: dials that measure a changing state, like the number of currently open connections, or the amount of memory being used.
-- distributions: samples that are interesting for their histogram, like timings.
+- distributions: samples that are interesting for their histogram, like timings (95th percentile of database reads, for example).
 
 Metrics are collected in a `Registry` (usually you create only one). On a configurable period, these metrics are summarized and sent to observers. The observers can push the summary to a push-based service like Riemann, or post the results to a web service for a poll-based service like Prometheus.
 
+FIXME tags...
+
+
 ## API
 
-xxx
+- `new Registry(options)`
+
+  The registry is the central coordinator for metrics collection and dispersal. It tracks metrics in a single namespace, and periodically takes a snapshot and sends it to any observers. (A typical observer might push the metrics into riemann, influxdb, or prometheus.)
+
+  Options:
+
+  - `period` (in milliseconds) - how often to send snapshots to observers; default is 60_000, or one minute
+  - `log` - a bunyan-compatible logger to use for debug logs; if no log is provided, nothing is logged
+  - `percentiles` (array) - percentiles to collect on distributions, as a real number between 0 and 1; default is `[ 0.5, 0.9, 0.99 ]`, or the 50th (median), 90th, and 99th percentiles
+  - `error` - number between 0 and 1 representing the rank error allowed when estimating percentiles; default is 0.01 (1%) which is usually fine
+  - `tags` - FIXME
+
+  The `percentiles` and `error` options are used as defaults and may be overridden by individual distributions. For more about how the distributions are calculated, see [distributions](#distributions) below.
+
+- `prometheusExporter(express, registry)`
+
+  FIXME
+
+- `viz(express, registry, span = 60 * 60 * 1000)`
+
+  FIXME
+
+- `startVizServer(express, registry, port = 8080)`
+
+  FIXME
+
+### Registry
+
+FIXME...
+
+## Distributions
+
+This section is for people curious about how distribution percentiles are calculated.
+
+Distributions are collected and sampled using a method described in ["Effective Computation of Biased Quantiles over Data Streams"](http://www.cs.rutgers.edu/~muthu/bquant.pdf). It attempts to keep only the samples closest to the desired percentiles, so for example, if you only want the median, it keeps most of the samples that fall in the middle of the range, but discards samples on either end. To do this, the algorithm needs to know the desired percentiles, and the allowable error.
+
+For most uses, this is overkill. If you specify an allowable rank error of 1%, and have fewer than 100 samples each minute, it's unlikely to discard _any_ of the samples, and will compute the percentiles directly.
+
+FIXME...
 
 ## TBD (more later here)
 
