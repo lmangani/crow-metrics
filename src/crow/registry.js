@@ -60,7 +60,7 @@ class Registry {
 
   _publish() {
     this.lastPublish = Date.now();
-    let snapshot = this.snapshot();
+    let snapshot = this._snapshot();
     if (this.log) this.log.trace(`Publishing ${Object.keys(this.metrics).length} metrics to ${this.observers.length} observers.`);
 
     this.observers.forEach((observer) => {
@@ -89,8 +89,9 @@ class Registry {
 
   /*
    * Grab a snapshot of the current value of each metric.
+   * Distributions will be reset.
    */
-  snapshot() {
+  _snapshot() {
     let rv = { "@types": {} };
     for (let key in this.metrics) {
       let metric = this.metrics[key];

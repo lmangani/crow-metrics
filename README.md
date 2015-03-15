@@ -2,7 +2,7 @@
 
 <img src="docs/crow-small.png" align="right">
 
-Crow is a library for collecting metrics about your server, similar to Twitter's Ostrich or Netflix's Servo.(*) It helps you track things like:
+Crow is a library for collecting metrics about your server, similar to Twitter's Ostrich or Netflix's Servo.(\*) It helps you track things like:
 
 - How many requests am I handling per second?
 - How many requests am I handling concurrently?
@@ -12,7 +12,7 @@ On a period of your choosing (for example, minutely) these metrics are summarize
 
 The goal of crow is to make it *dead simple* to collect and report these metrics, and to motivate you to add them everywhere!
 
-(*) Servo? Crow? GET IT? Ha ha ha.
+(\*) Servo? Crow? GET IT? Ha ha ha.
 
 ## Example
 
@@ -49,8 +49,21 @@ Metrics consist of:
 
 Metrics are collected in a `Registry` (usually you create only one). On a configurable period, these metrics are summarized and sent to observers. The observers can push the summary to a push-based service like Riemann, or post the results to a web service for a poll-based service like Prometheus.
 
-FIXME tags...
+Each metric has a name, which is a string. Crow doesn't care what's in the string, but if you're sending metrics to a service, most of them have a naming convention. In general, you should use a name that could be an identifier (starts with a letter, contains only letters, digits, and underscore). Some metrics services use dot to build folder-like namespaces. Typical metric names are:
 
+- `requests_received`
+- `mysql_select_count`
+- `users_query_msec`
+
+The last one is an example of a timing. Usually timings should include the time unit as the last segment of their name, as a convention.
+
+Each metric may also have a set of "tags" attached. A tag is a name/value pair, both strings, that identifies some variant of the metric. For example, a request handler may use a different tag for successful operations and exceptions. When generating string forms of metrics, the tags are appended in alphabetical order, separated by commas, surrounded by curly braces. (This is a standard form used by most of the open-source metrics services.)
+
+- `requests_handled{success=true}`
+- `requests_handled{exception=IOError}`
+- `requests_handled{exception=AccessDenied}`
+
+Tags are used by metrics services to split out interesting details while allowing the general case (`requests_handled` above) to be summarized.
 
 ## API
 
@@ -64,7 +77,7 @@ FIXME tags...
   - `log` - a bunyan-compatible logger to use for debug logs; if no log is provided, nothing is logged
   - `percentiles` (array) - percentiles to collect on distributions, as a real number between 0 and 1; default is `[ 0.5, 0.9, 0.99 ]`, or the 50th (median), 90th, and 99th percentiles
   - `error` - number between 0 and 1 representing the rank error allowed when estimating percentiles; default is 0.01 (1%) which is usually fine
-  - `tags` - FIXME
+  - `tags` - (object of string keys & values) set of tags to apply by default to every metric; often used for instance-wide tags like `instanceId` or `hostname`
 
   The `percentiles` and `error` options are used as defaults and may be overridden by individual distributions. For more about how the distributions are calculated, see [distributions](#distributions) below.
 
@@ -81,6 +94,44 @@ FIXME tags...
   FIXME
 
 ### Registry
+
+- `counter(name, tags = {})`
+
+  Return a new or existing counter with the given name and tags. Counter objects may be cached, or you may call `counter` to look it up each time. They have the following methods:
+
+  - `withTags(tags)`
+
+    Return a new or existing counter with the same name as this one, but different tags. This is useful if you have a cached counter object for a name, but sometimes want to increment a counter with a different tag (like an exception name).
+
+  - `increment(count = 1, tags = {})`
+
+    Increment the counter. If `tags` is given, it's a shortcut for calling `withTags()` first.
+
+  - `get()`
+
+    Return the current value of the counter.
+
+- `setGauge(name, tags = {}, getter)`
+
+  Build a new gauge with the given name, tags, and "getter". The "getter" is usually a function that will be called when crow wants to know the current value. If the value changes rarely, `getter` may be a number instead, and you can call `setGauge` with a new number each time the value changes.
+
+- `gauge(name, tags = {})`
+
+  Return the gauge with the given name and tags. If no such gauge is found, it throws an exception. A gauge has only one method:
+
+  - `get()`
+
+    Return the current value of the gauge by calling its getter.
+
+- `distribution(name, tags = {}, percentiles = this.percentiles, error = this.error)`
+
+  Return a new or existing distribution with the given name and tags. If `percentiles` or `error` is non-null, they will override the registry defaults.
+
+- `withPrefix(prefix)`
+
+FIXME...
+
+- `addObserver(observer)`
 
 FIXME...
 
