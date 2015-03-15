@@ -1,4 +1,4 @@
-# crow
+# crow-metrics
 
 <img src="docs/crow-small.png" align="right">
 
@@ -12,11 +12,14 @@ On a period of your choosing (for example, minutely) these metrics are summarize
 
 The goal of crow is to make it *dead simple* to collect and report these metrics, and to motivate you to add them everywhere!
 
-(\*) Servo? Crow? GET IT? Ha ha ha.
+(\*) Servo? Crow? _Get it?_ Ha ha ha.
+
+- [Example](#Example)
+- [How does it work?](#How does it work?)
 
 ## Example
 
-Here's a quick example of a web service that counts requests and response times, and publishes them in a format prometheus can poll:
+Here's a quick example of a web service that counts requests and response times, and publishes them in a format [prometheus](http://prometheus.io/) can poll:
 
 ```javascript
 var crow = require("crow-metrics");
@@ -43,9 +46,9 @@ webService.get("/", function (request, response) {
 
 Metrics consist of:
 
-- counters: things that only increase, like the number of requests handled since the server started.
-- gauges: dials that measure a changing state, like the number of currently open connections, or the amount of memory being used.
-- distributions: samples that are interesting for their histogram, like timings (95th percentile of database reads, for example).
+- *counters*: things that only increase, like the number of requests handled since the server started.
+- *gauges*: dials that measure a changing state, like the number of currently open connections, or the amount of memory being used.
+- *distributions*: samples that are interesting for their histogram, like timings (95th percentile of database reads, for example).
 
 Metrics are collected in a `Registry` (usually you create only one). On a configurable period, these metrics are summarized and sent to observers. The observers can push the summary to a push-based service like Riemann, or post the results to a web service for a poll-based service like Prometheus.
 
