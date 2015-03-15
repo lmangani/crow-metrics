@@ -18,6 +18,11 @@ The goal of crow is to make it *dead simple* to collect and report these metrics
 - [How does it work?](#how-does-it-work)
 - [API](#api)
   - [Registry](#registry)
+- [Metrics objects](#metrics-objects)
+  - [Gauge](#gauge)
+  - [Counter](#counter)
+  - [Distribution](#distribution)
+- [How distributions work](#how-distributions-work)
 - [Built-in plugins](#built-in-plugins)
   - [Prometheus](#prometheus)
   - [Viz](#viz)
@@ -198,7 +203,7 @@ Other methods vary based on the type:
 
   Return a new or existing distribution with the same name as this one, but different tags.
 
-## Distributions
+## How distributions work
 
 This section is for people curious about how distribution percentiles are calculated.
 
