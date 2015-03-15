@@ -14,8 +14,11 @@ The goal of crow is to make it *dead simple* to collect and report these metrics
 
 (\*) Servo? Crow? _Get it?_ Ha ha ha.
 
-- [Example](#Example)
-- [How does it work?](#How does it work?)
+- [Example](#example)
+- [How does it work?](#how-does-it-work)
+- [API](#api)
+  - [Registry](#registry)
+- []()
 
 ## Example
 
@@ -32,6 +35,9 @@ var metrics = new crow.Registry({ period: 60000 });
 
 // publish metrics to /metrics, formatted for prometheus.
 webService.use("/metrics", crow.prometheusExporter(express, metrics));
+
+// track heap used as a gauge, just for fun.
+metrics.setGauge("heap_used", function () { return process.memoryUsage().heapUsed; });
 
 webService.get("/", function (request, response) {
   metrics.counter("request_count").increment();
