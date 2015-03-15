@@ -18,7 +18,9 @@ The goal of crow is to make it *dead simple* to collect and report these metrics
 - [How does it work?](#how-does-it-work)
 - [API](#api)
   - [Registry](#registry)
-- []()
+- [Built-in plugins](#built-in-plugins)
+  - [Prometheus](#prometheus)
+  - [Viz](#viz)
 
 ## Example
 
@@ -52,9 +54,9 @@ webService.get("/", function (request, response) {
 
 Metrics consist of:
 
-- *counters*: things that only increase, like the number of requests handled since the server started.
-- *gauges*: dials that measure a changing state, like the number of currently open connections, or the amount of memory being used.
-- *distributions*: samples that are interesting for their histogram, like timings (95th percentile of database reads, for example).
+- **counters**: things that only increase, like the number of requests handled since the server started.
+- **gauges**: dials that measure a changing state, like the number of currently open connections, or the amount of memory being used.
+- **distributions**: samples that are interesting for their histogram, like timings (95th percentile of database reads, for example).
 
 Metrics are collected in a `Registry` (usually you create only one). On a configurable period, these metrics are summarized and sent to observers. The observers can push the summary to a push-based service like Riemann, or post the results to a web service for a poll-based service like Prometheus.
 
@@ -92,33 +94,21 @@ Tags are used by metrics services to split out interesting details while allowin
 
 - `prometheusExporter(express, registry)`
 
-  FIXME
+  See the [prometheus plugin](#prometheus) below.
 
 - `viz(express, registry, span = 60 * 60 * 1000)`
 
-  FIXME
+  See the [viz plugin](#viz) below.
 
 - `startVizServer(express, registry, port = 8080)`
 
-  FIXME
+  See the [viz plugin](#viz) below.
 
 ### Registry
 
 - `counter(name, tags = {})`
 
-  Return a new or existing counter with the given name and tags. Counter objects may be cached, or you may call `counter` to look it up each time. They have the following methods:
-
-  - `withTags(tags)`
-
-    Return a new or existing counter with the same name as this one, but different tags. This is useful if you have a cached counter object for a name, but sometimes want to increment a counter with a different tag (like an exception name).
-
-  - `increment(count = 1, tags = {})`
-
-    Increment the counter. If `tags` is given, it's a shortcut for calling `withTags()` first.
-
-  - `get()`
-
-    Return the current value of the counter.
+  Return a new or existing counter with the given name and tags. Counter objects may be cached, or you may call `counter` to look it up each time. See [Metrics objects](#metrics-objects) below for the counter object API.
 
 - `setGauge(name, tags = {}, getter)`
 
@@ -126,15 +116,11 @@ Tags are used by metrics services to split out interesting details while allowin
 
 - `gauge(name, tags = {})`
 
-  Return the gauge with the given name and tags. If no such gauge is found, it throws an exception. A gauge has only one method:
-
-  - `get()`
-
-    Return the current value of the gauge by calling its getter.
+  Return the gauge with the given name and tags. If no such gauge is found, it throws an exception. See [Metrics objects](#metrics-objects) below for the gauge object API.
 
 - `distribution(name, tags = {}, percentiles = this.percentiles, error = this.error)`
 
-  Return a new or existing distribution with the given name and tags. If `percentiles` or `error` is non-null, they will override the registry defaults.
+  Return a new or existing distribution with the given name and tags. If `percentiles` or `error` is non-null, they will override the registry defaults. See [Metrics objects](#metrics-objects) below for the distribution object API.
 
 - `withPrefix(prefix)`
 
@@ -143,6 +129,74 @@ FIXME...
 - `addObserver(observer)`
 
 FIXME...
+
+## Metrics objects
+
+All metrics objects created by a `Registry` have a field `type` which is one of the following values:
+
+- `MetricType.GAUGE`
+- `MetricType.COUNTER`
+- `MetricType.DISTRIBUTION`
+
+Other methods vary based on the type:
+
+### Gauge
+
+- `get()`
+
+  Return the current value of the gauge by calling its getter.
+
+### Counter
+
+- `get()`
+
+  Return the current value of the counter.
+
+- `increment(count = 1, tags = {})`
+
+  Increment the counter. If `tags` is given, it's a shortcut for calling `withTags()` first.
+
+- `withTags(tags)`
+
+  Return a new or existing counter with the same name as this one, but different tags. This is useful if you have a cached counter object for a name, but sometimes want to increment a counter with a different tag (like an exception name).
+
+### Distribution
+
+- `get()`
+
+  Compute percentiles based on the samples collected, and reset the collection. This is a destructive operation, so normally it's only used by `Registry` to generate the periodic snapshots.
+
+  The returned object will contain a key for each percentile requested, and an additional "count" metric to report the number of samples in this time period. Percentiles are represented by adding a "quantile" tag.
+
+  For example, when computing the 50th and 95th percentiles of a metric called `request_time_msec`, `get()` will return an object like this:
+
+  ```javascript
+  {
+    "request_time_msec{quantile=\"0.5\"}": 23,
+    "request_time_msec{quantile=\"0.95\"}": 81,
+    "request_time_msec_count": 104
+  }
+  ```
+
+- `add(data)`
+
+  Add a sample to the distribution. If `data` is an array, all the data points in the array are added.
+
+- `time(f)`
+
+  Call `f` as a function, recording the time it takes to complete, in milliseconds. If `f` returns a promise (an object with a field named `then` which is a function), it will record the time it takes the promise to complete. Returns whatever `f` returns, so you can call it inline like:
+
+  ```javascript
+  var dbTimer = registry.distribution("db_select_msec");
+
+  dbTimer.time(db.select("...")).then(function (rows) {
+    // ...
+  });
+  ```
+
+- `withTags(tags)`
+
+  Return a new or existing distribution with the same name as this one, but different tags.
 
 ## Distributions
 
