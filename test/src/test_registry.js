@@ -72,6 +72,27 @@ describe("Registry", () => {
     r.counter("buckets", { contents: "fire" }).get().should.eql(10);
   });
 
+  it("honors default tags", () => {
+    let r = new registry.Registry({ tags: { instance: "i-ffff" } });
+    r.counter("a", { city: "San Jose" });
+    r.counter("b", { instance: "i-0000" });
+    r.setGauge("c", { city: "Berryessa" }, 100);
+    r.setGauge("d", { instance: "i-1111" }, 100);
+    r.distribution("e", { city: "Alum Rock" }, [ 0.5 ]).add(1);
+    r.distribution("f", { instance: "i-2222" }, [ 0.5 ]).add(1);
+
+    Object.keys(r.snapshot()).filter((name) => name[0] != "@").sort().should.eql([
+      `a{city="San Jose",instance="i-ffff"}`,
+      `b{instance="i-0000"}`,
+      `c{city="Berryessa",instance="i-ffff"}`,
+      `d{instance="i-1111"}`,
+      `e_count{city="Alum Rock",instance="i-ffff"}`,
+      `e{city="Alum Rock",instance="i-ffff",quantile="0.5"}`,
+      `f_count{instance="i-2222"}`,
+      `f{instance="i-2222",quantile="0.5"}`,
+    ]);
+  });
+
   it("makes a snapshot", () => {
     let r = new registry.Registry();
     r.counter("buckets", { city: "San Jose" }).increment(10);
