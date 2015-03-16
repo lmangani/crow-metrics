@@ -97,7 +97,8 @@ class Distribution {
   }
 
   get() {
-    let snapshot = this.distribution.reset();
+    let snapshot = this.distribution.snapshot();
+    this.distribution.reset();
     let rv = {};
     if (snapshot.sampleCount == 0) return rv;
     this.percentiles.forEach((p) => {

@@ -1,3 +1,5 @@
+"use strict";
+
 let util = require("util");
 
 // immutable snapshot of the samples, for calculating percentiles.
@@ -62,13 +64,18 @@ class BiasedQuantileDistribution {
   }
 
   // clear the samples, returning a snapshot of the previous results.
-  reset() {
+  resetWithSnapshot() {
     let rv = this.snapshot();
+    this.reset();
+    return rv;
+  }
+
+  // clear out any previously stored samples, and start over.
+  reset() {
     this.sampleCount = 0;
     this.samples = [];
     this.deltasWithinBucket = [];
     this.deltasBetweenBuckets = [];
-    return rv;
   }
 
   // return an immutable view of the current sample set, for querying.

@@ -39,7 +39,7 @@ function validate(dist, samples) {
   samples.forEach((v) => dist.record(v));
   let sorted = samples.slice();
   sorted.sort((a, b) => a - b);
-  let snapshot = dist.reset();
+  let snapshot = dist.resetWithSnapshot();
   dist.percentiles.forEach((p) => rankError(sorted, p, snapshot.getPercentile(p)).should.not.be.greaterThan(dist.error));
 }
 
