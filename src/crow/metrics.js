@@ -42,7 +42,7 @@ class Counter {
    * counter is created.
    */
   withTags(tags) {
-    return this.registry.counter(this.name, this.registry._mergeTags(this.tags, tags));
+    return this.registry.counter(this.name, mergeTags(this.tags, tags));
   }
 
   increment(count = 1, tags = {}) {
@@ -82,7 +82,7 @@ class Distribution {
    * distribution is created.
    */
   withTags(tags) {
-    return this.registry.distribution(this.name, this.registry._mergeTags(this.tags, tags), this.percentiles, this.error);
+    return this.registry.distribution(this.name, mergeTags(this.tags, tags), this.percentiles, this.error);
   }
 
   /*
@@ -127,6 +127,19 @@ class Distribution {
       return rv;
     }
   }
+}
+
+function mergeTags(tags, newtags) {
+  let rv = {};
+  for (let key in tags) rv[key] = tags[key];
+  for (let key in newtags) {
+    if (newtags[key] === null) {
+      delete rv[key];
+    } else {
+      rv[key] = newtags[key];
+    }
+  }
+  return rv;
 }
 
 

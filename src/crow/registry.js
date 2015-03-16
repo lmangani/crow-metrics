@@ -19,6 +19,7 @@ let MetricType = metrics.MetricType;
  * - percentiles: (array) default percentiles to track on distributions
  * - error: (number) default error to allow on distribution ranks
  * - log: bunyan logger for debugging
+ * - tags: (object) default tags to apply to each metric
  */
 class Registry {
   /*
@@ -35,6 +36,7 @@ class Registry {
     this.error = options.error || DEFAULT_ERROR;
     this.log = options.log;
     this.lastPublish = Date.now();
+    this.tags = options.tags || {};
 
     // if the period is a multiple of minute, 30 sec, 5 sec, or 1 sec, then
     // round the next publish time to that.
@@ -112,7 +114,7 @@ class Registry {
    * If no counter by that name/tag combination exists, it's created.
    */
   counter(name, tags = {}) {
-    return this._getOrMake(name, tags, MetricType.COUNTER, () => new metrics.Counter(this, name, tags));
+    return this._getOrMake(name, mergeDefaults(tags, this.tags), MetricType.COUNTER, () => new metrics.Counter(this, name, mergeDefaults(tags, this.tags)));
   }
 
   /*
@@ -120,7 +122,7 @@ class Registry {
    * If no gauge by that name/tag combination exists, an exception is thrown.
    */
   gauge(name, tags = {}) {
-    return this._getOrMake(name, tags, MetricType.GAUGE, () => {
+    return this._getOrMake(name, mergeDefaults(tags, this.tags), MetricType.GAUGE, () => {
       throw new Error("No such metric");
     });
   }
@@ -137,7 +139,7 @@ class Registry {
       getter = tags;
       tags = {};
     }
-    return this._getOrMake(name, tags, MetricType.GAUGE, () => new metrics.Gauge(name, getter));
+    return this._getOrMake(name, mergeDefaults(tags, this.tags), MetricType.GAUGE, () => new metrics.Gauge(name, getter));
   }
 
   /*
@@ -145,7 +147,7 @@ class Registry {
    * If no distribution by that name/tag combination exists, it's generated.
    */
   distribution(name, tags = {}, percentiles = this.percentiles, error = this.error) {
-    return this._getOrMake(name, tags, MetricType.DISTRIBUTION, () => new metrics.Distribution(this, name, tags, percentiles, error));
+    return this._getOrMake(name, mergeDefaults(tags, this.tags), MetricType.DISTRIBUTION, () => new metrics.Distribution(this, name, mergeDefaults(tags, this.tags), percentiles, error));
   }
   
   /*
@@ -182,19 +184,13 @@ class Registry {
     if (extraKeys.length > 0) fields = fields.concat(extraKeys.map((key) => `${key}="${extraTags[key]}"`));
     return name + "{" + fields.join(",") + "}";
   }
+}
 
-  _mergeTags(tags, newtags) {
-    let rv = {};
-    for (let key in tags) rv[key] = tags[key];
-    for (let key in newtags) {
-      if (newtags[key] === null) {
-        delete rv[key];
-      } else {
-        rv[key] = newtags[key];
-      }
-    }
-    return rv;
+function mergeDefaults(tags, defaults) {
+  for (let key in defaults) {
+    if (tags[key] === undefined) tags[key] = defaults[key];
   }
+  return tags;
 }
 
 
