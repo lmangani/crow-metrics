@@ -81,7 +81,7 @@ describe("Registry", () => {
     r.distribution("e", { city: "Alum Rock" }, [ 0.5 ]).add(1);
     r.distribution("f", { instance: "i-2222" }, [ 0.5 ]).add(1);
 
-    Object.keys(r.snapshot()).filter((name) => name[0] != "@").sort().should.eql([
+    Object.keys(r._snapshot()).filter((name) => name[0] != "@").sort().should.eql([
       `a{city="San Jose",instance="i-ffff"}`,
       `b{instance="i-0000"}`,
       `c{city="Berryessa",instance="i-ffff"}`,
@@ -157,6 +157,12 @@ describe("Registry", () => {
       "myserver_dist{quantile=\"0.5\"}",
       "myserver_gauge",
       "myserver_moar_wut"
+    ]);
+
+    let rr = new registry.Registry({ separator: "." });
+    rr.withPrefix("prod").withPrefix("racetrack").counter("requests").increment();
+    Object.keys(rr._snapshot()).filter((x) => x[0] != "@").sort().should.eql([
+      "prod.racetrack.requests"
     ]);
   })
 });
