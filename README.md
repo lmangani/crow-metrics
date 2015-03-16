@@ -94,6 +94,7 @@ Tags are used by metrics services to split out interesting details while allowin
   - `percentiles` (array) - percentiles to collect on distributions, as a real number between 0 and 1; default is `[ 0.5, 0.9, 0.99 ]`, or the 50th (median), 90th, and 99th percentiles
   - `error` - number between 0 and 1 representing the rank error allowed when estimating percentiles; default is 0.01 (1%) which is usually fine
   - `tags` - (object of string keys & values) set of tags to apply by default to every metric; often used for instance-wide tags like `instanceId` or `hostname`
+  - `separator` - (string) what to use to separate segments in metric names with `withPrefix`
 
   The `percentiles` and `error` options are used as defaults and may be overridden by individual distributions. For more about how the distributions are calculated, see [distributions](#distributions) below.
 
@@ -129,11 +130,33 @@ Tags are used by metrics services to split out interesting details while allowin
 
 - `withPrefix(prefix)`
 
-FIXME...
+  Return a registry-like object which prefixes all metric names with the given prefix plus the separator (usually "_" but set in a `Registry` constructor option). The returned object is really a "view" of this registry. For example, the following two lines create or find the same counter:
+
+  ```javascript
+  var registry = new crow.Registry({ separator: "." });
+  registry.counter("cats.meals")
+  registry.withPrefix("cats").counter("meals")
+  ```
 
 - `addObserver(observer)`
 
-FIXME...
+  Add an observer. The registry maintains an array of observer objects, and sends a snapshot of the current state to each observer at each interval specified by the period of the registry. For example, if the registry's period is 60000, or 60 seconds, then each observer is invoked minutely.
+
+  The observers are all expected to be functions that expect two parameters:
+
+  - `function observer(timestamp, snapshot)`
+
+  The timestamp is the current epoch time in milliseconds. The snapshot is an object with string keys and numeric values. The keys are fully-qualified metric names with the tags expanded. An example snapshot:
+
+  ```javascript
+  {
+    "request_time_msec{quantile=\"0.99\"}": 32,
+    "request_time_msec_count": 9,
+    "heap_used": 14937602
+  }
+  ```
+
+  A typical observer collects the metrics snapshot and reports it to another service, either by pull (exposing the metrics on a web port) or push (sending them immediately to another server). [Viz](#viz) is an observer that collects an hour of metrics and makes a simple web page summarizing the data.
 
 ## Metrics objects
 
