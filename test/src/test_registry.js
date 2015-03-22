@@ -81,7 +81,7 @@ describe("Registry", () => {
     r.distribution("e", { city: "Alum Rock" }, [ 0.5 ]).add(1);
     r.distribution("f", { instance: "i-2222" }, [ 0.5 ]).add(1);
 
-    Object.keys(r.snapshot()).filter((name) => name[0] != "@").sort().should.eql([
+    Object.keys(r._snapshot()).filter((name) => name[0] != "@").sort().should.eql([
       `a{city="San Jose",instance="i-ffff"}`,
       `b{instance="i-0000"}`,
       `c{city="Berryessa",instance="i-ffff"}`,
@@ -100,7 +100,7 @@ describe("Registry", () => {
     r.counter("buckets", { contents: "fire" }).increment(3);
     r.setGauge("speed", 150);
     r.distribution("stars").withTags({ galaxy: "1a" }).add([ 90, 100, 110 ]);
-    r.snapshot().should.eql({
+    r._snapshot().should.eql({
       "@types": {
         buckets: registry.MetricType.COUNTER,
         cats: registry.MetricType.COUNTER,
@@ -151,12 +151,18 @@ describe("Registry", () => {
     let r3 = r2.withPrefix("moar");
     r3.counter("wut").increment(8);
 
-    Object.keys(r.snapshot()).filter((x) => x[0] != "@").sort().should.eql([
+    Object.keys(r._snapshot()).filter((x) => x[0] != "@").sort().should.eql([
       "myserver_counter",
       "myserver_dist_count",
       "myserver_dist{quantile=\"0.5\"}",
       "myserver_gauge",
       "myserver_moar_wut"
+    ]);
+
+    let rr = new registry.Registry({ separator: "." });
+    rr.withPrefix("prod").withPrefix("racetrack").counter("requests").increment();
+    Object.keys(rr._snapshot()).filter((x) => x[0] != "@").sort().should.eql([
+      "prod.racetrack.requests"
     ]);
   })
 });

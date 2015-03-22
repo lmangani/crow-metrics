@@ -20,6 +20,7 @@ let MetricType = metrics.MetricType;
  * - error: (number) default error to allow on distribution ranks
  * - log: bunyan logger for debugging
  * - tags: (object) default tags to apply to each metric
+ * - separator: (string) what to use in `withPrefix`; default is "_"
  */
 class Registry {
   /*
@@ -37,6 +38,7 @@ class Registry {
     this.log = options.log;
     this.lastPublish = Date.now();
     this.tags = options.tags || {};
+    this.separator = options.separator || "_";
 
     // if the period is a multiple of minute, 30 sec, 5 sec, or 1 sec, then
     // round the next publish time to that.
@@ -62,7 +64,7 @@ class Registry {
 
   _publish() {
     this.lastPublish = Date.now();
-    let snapshot = this.snapshot();
+    let snapshot = this._snapshot();
     if (this.log) this.log.trace(`Publishing ${Object.keys(this.metrics).length} metrics to ${this.observers.length} observers.`);
 
     this.observers.forEach((observer) => {
@@ -91,8 +93,9 @@ class Registry {
 
   /*
    * Grab a snapshot of the current value of each metric.
+   * Distributions will be reset.
    */
-  snapshot() {
+  _snapshot() {
     let rv = { "@types": {} };
     for (let key in this.metrics) {
       let metric = this.metrics[key];
@@ -106,7 +109,7 @@ class Registry {
           rv[key] = this.metrics[key].get();
       }
     }
-    return rv;    
+    return rv;
   }
 
   /*
@@ -149,18 +152,19 @@ class Registry {
   distribution(name, tags = {}, percentiles = this.percentiles, error = this.error) {
     return this._getOrMake(name, mergeDefaults(tags, this.tags), MetricType.DISTRIBUTION, () => new metrics.Distribution(this, name, mergeDefaults(tags, this.tags), percentiles, error));
   }
-  
+
   /*
    * Return a new registry-like object that has accessors for metrics, but
    * prefixes all names with `(prefix)_`.
    */
   withPrefix(prefix) {
     return {
-      counter: (name, tags) => this.counter(`${prefix}_${name}`, tags),
-      gauge: (name, tags) => this.gauge(`${prefix}_${name}`, tags),
-      setGauge: (name, tags, getter) => this.setGauge(`${prefix}_${name}`, tags, getter),
-      distribution: (name, tags, percentiles, error) => this.distribution(`${prefix}_${name}`, tags, percentiles, error),
-      withPrefix: (nextPrefix) => this.withPrefix(`${prefix}_${nextPrefix}`)
+      counter: (name, tags) => this.counter(`${prefix}${this.separator}${name}`, tags),
+      gauge: (name, tags) => this.gauge(`${prefix}${this.separator}${name}`, tags),
+      setGauge: (name, tags, getter) => this.setGauge(`${prefix}${this.separator}${name}`, tags, getter),
+      distribution: (name, tags, percentiles, error) => this.distribution(`${prefix}${this.separator}${name}`, tags, percentiles, error),
+      withPrefix: (nextPrefix) => this.withPrefix(`${prefix}${this.separator}${nextPrefix}`),
+      addObserver: (x) => this.addObserver(x)
     };
   }
 
