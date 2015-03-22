@@ -130,7 +130,7 @@ Tags are used by metrics services to split out interesting details while allowin
 
 - `withPrefix(prefix)`
 
-  Return a registry-like object which prefixes all metric names with the given prefix plus the separator (usually "_" but set in a `Registry` constructor option). The returned object is really a "view" of this registry. For example, the following two lines create or find the same counter:
+  Return a registry-like object which prefixes all metric names with the given prefix plus the separator (usually "\_" but set in a `Registry` constructor option). The returned object is really a "view" of this registry. For example, the following two lines create or find the same counter:
 
   ```javascript
   var registry = new crow.Registry({ separator: "." });
@@ -142,7 +142,7 @@ Tags are used by metrics services to split out interesting details while allowin
 
   Add an observer. The registry maintains an array of observer objects, and sends a snapshot of the current state to each observer at each interval specified by the period of the registry. For example, if the registry's period is 60000, or 60 seconds, then each observer is invoked minutely.
 
-  The observers are all expected to be functions that expect two parameters:
+  The observers are all expected to be functions that accept two parameters:
 
   - `function observer(timestamp, snapshot)`
 
@@ -232,13 +232,9 @@ This section is for people curious about how distribution percentiles are calcul
 
 Distributions are collected and sampled using a method described in ["Effective Computation of Biased Quantiles over Data Streams"](http://www.cs.rutgers.edu/~muthu/bquant.pdf). It attempts to keep only the samples closest to the desired percentiles, so for example, if you only want the median, it keeps most of the samples that fall in the middle of the range, but discards samples on either end. To do this, the algorithm needs to know the desired percentiles, and the allowable error.
 
-For most uses, this is overkill. If you specify an allowable rank error of 1%, and have fewer than 100 samples each minute, it's unlikely to discard _any_ of the samples, and will compute the percentiles directly.
+For most uses, this is overkill. If you specify an allowable rank error of 1%, and have fewer than 100 samples each minute, it's unlikely to discard _any_ of the samples, and will compute the percentiles directly. But if you have thousands of samples, it will discard most of them as it narrows in on the likely range of each percentile.
 
-FIXME...
-
-## TBD (more later here)
-
-xxx
+The upshot is that for small servers, it's equivalent to keeping all the samples and computing the percentiles exactly on each interval. For large servers, it processes batches of samples at a time (varying based on the desired error; 50 at a time for 1%) and computes a close estimate, using a small fraction of the samples.
 
 ## Built-in plugins
 
