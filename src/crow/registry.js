@@ -142,7 +142,7 @@ class Registry {
       getter = tags;
       tags = {};
     }
-    return this._getOrMake(name, mergeDefaults(tags, this.tags), MetricType.GAUGE, () => new metrics.Gauge(name, getter));
+    return this._getOrMake(name, mergeDefaults(tags, this.tags), MetricType.GAUGE, () => new metrics.Gauge(name, getter)).set(getter);
   }
 
   /*

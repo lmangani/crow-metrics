@@ -32,6 +32,14 @@ describe("Registry", () => {
     r.gauge("computed", { animal: "cat" }).get().should.eql(2);
   });
 
+  it("replaces gauges", () => {
+    let r = new registry.Registry();
+    r.setGauge("speed", 100);
+    r.gauge("speed").get().should.eql(100);
+    r.setGauge("speed", 150);
+    r.gauge("speed").get().should.eql(150);
+  });
+
   it("remembers distributions", () => {
     let r = new registry.Registry();
     let d = r.distribution("stars", {}, [ 0.5, 0.9 ]);

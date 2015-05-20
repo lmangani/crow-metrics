@@ -21,6 +21,10 @@ class Gauge {
   constructor(name, getter) {
     this.name = name;
     this.type = MetricType.GAUGE;
+    this.set(getter);
+  }
+
+  set(getter) {
     this.get = (typeof getter === "function") ? getter : (() => getter);
   }
 }
