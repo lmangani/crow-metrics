@@ -38,6 +38,8 @@ describe("Registry", () => {
     r.gauge("speed").get().should.eql(100);
     r.setGauge("speed", 150);
     r.gauge("speed").get().should.eql(150);
+    r.setGauge("speed", 130);
+    r._snapshot()["speed"].should.eql(130);
   });
 
   it("remembers distributions", () => {
