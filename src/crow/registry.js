@@ -117,7 +117,7 @@ class Registry {
    * If no counter by that name/tag combination exists, it's created.
    */
   counter(name, tags = {}) {
-    return this._getOrMake(name, mergeDefaults(tags, this.tags), MetricType.COUNTER, () => new metrics.Counter(this, name, mergeDefaults(tags, this.tags)));
+    return this._getOrMake(name, mergeDefaults(tags, this.tags), MetricType.COUNTER, (name, fullname, tags) => new metrics.Counter(this, name, fullname, tags));
   }
 
   /*
@@ -125,7 +125,7 @@ class Registry {
    * If no gauge by that name/tag combination exists, an exception is thrown.
    */
   gauge(name, tags = {}) {
-    return this._getOrMake(name, mergeDefaults(tags, this.tags), MetricType.GAUGE, () => {
+    return this._getOrMake(name, mergeDefaults(tags, this.tags), MetricType.GAUGE, (name, fullname, tags) => {
       throw new Error("No such metric");
     });
   }
@@ -142,7 +142,7 @@ class Registry {
       getter = tags;
       tags = {};
     }
-    return this._getOrMake(name, mergeDefaults(tags, this.tags), MetricType.GAUGE, () => new metrics.Gauge(name, getter)).set(getter);
+    return this._getOrMake(name, mergeDefaults(tags, this.tags), MetricType.GAUGE, (name, fullname, tags) => new metrics.Gauge(name, fullname, tags, getter)).set(getter);
   }
 
   /*
@@ -150,7 +150,9 @@ class Registry {
    * If no distribution by that name/tag combination exists, it's generated.
    */
   distribution(name, tags = {}, percentiles = this.percentiles, error = this.error) {
-    return this._getOrMake(name, mergeDefaults(tags, this.tags), MetricType.DISTRIBUTION, () => new metrics.Distribution(this, name, mergeDefaults(tags, this.tags), percentiles, error));
+    return this._getOrMake(name, mergeDefaults(tags, this.tags), MetricType.DISTRIBUTION, (name, fullname, tags) => {
+      return new metrics.Distribution(this, name, fullname, tags, percentiles, error);
+    });
   }
 
   /*
@@ -168,6 +170,7 @@ class Registry {
     };
   }
 
+  // maker: (name, fullname, tags) => metric object
   _getOrMake(name, tags, type, maker) {
     let fullname = this._fullname(name, tags);
     let metric = this.metrics[fullname];
@@ -175,7 +178,7 @@ class Registry {
       if (metric.type != type) throw new Error(`${fullname} is already a ${metrics.metricName(metric.type).toLowerCase()}`);
       return metric;
     }
-    metric = maker();
+    metric = maker(name, fullname, tags);
     this.metrics[fullname] = metric;
     return metric;
   }

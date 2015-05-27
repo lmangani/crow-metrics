@@ -18,8 +18,10 @@ function metricName(i) {
 }
 
 class Gauge {
-  constructor(name, getter) {
+  constructor(name, fullname, tags, getter) {
     this.name = name;
+    this.fullname = fullname;
+    this.tags = tags;
     this.type = MetricType.GAUGE;
     this.set(getter);
   }
@@ -30,9 +32,10 @@ class Gauge {
 }
 
 class Counter {
-  constructor(registry, name, tags = {}) {
+  constructor(registry, name, fullname, tags = {}) {
     this.registry = registry;
     this.name = name;
+    this.fullname = fullname;
     this.tags = tags;
     this.type = MetricType.COUNTER;
     this.value = 0;
@@ -68,9 +71,10 @@ class Counter {
 }
 
 class Distribution {
-  constructor(registry, name, tags = {}, percentiles, error) {
+  constructor(registry, name, fullname, tags = {}, percentiles, error) {
     this.registry = registry;
     this.name = name;
+    this.fullname = fullname;
     this.tags = tags;
     this.percentiles = percentiles;
     this.error = error;
