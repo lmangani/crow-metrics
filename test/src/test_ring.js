@@ -29,7 +29,11 @@ describe("RingBufferObserver", () => {
     r._publish();
     r.counter("bruises").increment();
     r._publish();
-    rb.toJson()["bruises"].should.eql([ 2, 1 ]);
+    r._publish();
+    r.counter("bruises").increment();
+    r.counter("bruises").increment();
+    r._publish();
+    rb.toJson()["bruises"].should.eql([ 2, 1, 0, 2 ]);
   });
 
   it("tracks distributions", () => {
