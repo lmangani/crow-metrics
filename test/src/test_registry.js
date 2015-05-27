@@ -49,7 +49,8 @@ describe("Registry", () => {
     d.get().should.eql({
       "stars{quantile=\"0.5\"}": 20,
       "stars{quantile=\"0.9\"}": 30,
-      "stars_count": 3
+      "stars_count": 3,
+      "stars_sum": 60
     });
 
     d = r.distribution("stars", { galaxy: "1a" }, [ 0.5, 0.9 ]);
@@ -57,7 +58,8 @@ describe("Registry", () => {
     r.distribution("stars", { galaxy: "1a" }).get().should.eql({
       "stars{galaxy=\"1a\",quantile=\"0.5\"}": 300,
       "stars{galaxy=\"1a\",quantile=\"0.9\"}": 500,
-      "stars_count{galaxy=\"1a\"}": 3
+      "stars_count{galaxy=\"1a\"}": 3,
+      "stars_sum{galaxy=\"1a\"}": 900,
     });
   });
 
@@ -69,6 +71,7 @@ describe("Registry", () => {
       rv.should.eql(99);
       let stats = d.get()
       stats["stars_count"].should.eql(2);
+      stats["stars_sum"].should.be.greaterThan(49);
       stats["stars{quantile=\"0.5\"}"].should.be.greaterThan(49);
       done();
     });
@@ -97,8 +100,10 @@ describe("Registry", () => {
       `c{city="Berryessa",instance="i-ffff"}`,
       `d{instance="i-1111"}`,
       `e_count{city="Alum Rock",instance="i-ffff"}`,
+      `e_sum{city="Alum Rock",instance="i-ffff"}`,
       `e{city="Alum Rock",instance="i-ffff",quantile="0.5"}`,
       `f_count{instance="i-2222"}`,
+      `f_sum{instance="i-2222"}`,
       `f{instance="i-2222",quantile="0.5"}`,
     ]);
   });
@@ -124,7 +129,8 @@ describe("Registry", () => {
       "stars{galaxy=\"1a\",quantile=\"0.5\"}": 100,
       "stars{galaxy=\"1a\",quantile=\"0.9\"}": 110,
       "stars{galaxy=\"1a\",quantile=\"0.99\"}": 110,
-      "stars_count{galaxy=\"1a\"}": 3
+      "stars_count{galaxy=\"1a\"}": 3,
+      "stars_sum{galaxy=\"1a\"}": 300
     });
   });
 
@@ -164,6 +170,7 @@ describe("Registry", () => {
     Object.keys(r._snapshot()).filter((x) => x[0] != "@").sort().should.eql([
       "myserver_counter",
       "myserver_dist_count",
+      "myserver_dist_sum",
       "myserver_dist{quantile=\"0.5\"}",
       "myserver_gauge",
       "myserver_moar_wut"

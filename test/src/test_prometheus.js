@@ -46,6 +46,7 @@ describe("PrometheusObserver", () => {
       `coins_building_4{quantile="0.9"} 12 ${p.lastTimestamp}`,
       `coins_building_4{quantile="0.99"} 12 ${p.lastTimestamp}`,
       `coins_building_4_count 3 ${p.lastTimestamp}`,
+      `coins_building_4_sum 33 ${p.lastTimestamp}`,
       ""
     ]);
   });

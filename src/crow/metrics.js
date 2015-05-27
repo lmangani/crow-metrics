@@ -109,6 +109,7 @@ class Distribution {
       rv[this.registry._fullname(this.name, this.tags, { quantile: p })] = snapshot.getPercentile(p);
     });
     rv[this.registry._fullname(this.name + "_count", this.tags)] = snapshot.sampleCount;
+    rv[this.registry._fullname(this.name + "_sum", this.tags)] = snapshot.sampleSum;
     return rv;
   }
 

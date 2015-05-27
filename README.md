@@ -194,7 +194,11 @@ Other methods vary based on the type:
 
   Compute percentiles based on the samples collected, and reset the collection. This is a destructive operation, so normally it's only used by `Registry` to generate the periodic snapshots.
 
-  The returned object will contain a key for each percentile requested, and an additional "count" metric to report the number of samples in this time period. Percentiles are represented by adding a "quantile" tag.
+  The returned object will contain a key for each percentile requested, and two additional metrics:
+  - a `(name)_count` metric to report the number of samples in this time period
+  - a `(name)_sum` metric to report the sum of all samples in this time period
+
+  Percentiles are represented by adding a "quantile" tag.
 
   For example, when computing the 50th and 95th percentiles of a metric called `request_time_msec`, `get()` will return an object like this:
 
@@ -202,7 +206,8 @@ Other methods vary based on the type:
   {
     "request_time_msec{quantile=\"0.5\"}": 23,
     "request_time_msec{quantile=\"0.95\"}": 81,
-    "request_time_msec_count": 104
+    "request_time_msec_count": 104,
+    "request_time_msec_sum": 4188
   }
   ```
 
