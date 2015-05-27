@@ -27,6 +27,11 @@ function viz(express, registry, span = ring.DEFAULT_SPAN) {
     response.send(observer.toJson());
   });
 
+  router.get("/debug.json", (request, response) => {
+    response.type("json");
+    response.send(observer.get());
+  });
+
   return router;
 }
 
