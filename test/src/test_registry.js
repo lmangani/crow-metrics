@@ -118,9 +118,12 @@ describe("Registry", () => {
     r._snapshot().should.eql({
       "@types": {
         buckets: registry.MetricType.COUNTER,
+        "buckets{city=\"San Jose\"}": registry.MetricType.COUNTER,
+        "buckets{contents=\"fire\"}": registry.MetricType.COUNTER,
         cats: registry.MetricType.COUNTER,
         speed: registry.MetricType.GAUGE,
-        stars: registry.MetricType.DISTRIBUTION
+        stars: registry.MetricType.DISTRIBUTION,
+        "stars{galaxy=\"1a\"}": registry.MetricType.DISTRIBUTION,
       },
       "cats": 900,
       "buckets{city=\"San Jose\"}": 10,

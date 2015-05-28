@@ -32,6 +32,7 @@ class PrometheusObserver {
     let types = this.lastSnapshot["@types"] || {};
 
     for (let name in types) {
+      if (name.indexOf("{") >= 0) continue;
       let typename = "unknown";
       switch (types[name]) {
         case registry.MetricType.GAUGE:

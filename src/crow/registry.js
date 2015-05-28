@@ -100,6 +100,7 @@ class Registry {
     for (let key in this.metrics) {
       let metric = this.metrics[key];
       rv["@types"][metric.name] = metric.type;
+      rv["@types"][metric.fullname] = metric.type;
       switch (metric.type) {
         case MetricType.DISTRIBUTION:
           let stats = this.metrics[key].get();
