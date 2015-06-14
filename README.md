@@ -43,12 +43,16 @@ var metrics = new crow.Registry({ period: 60000 });
 // publish metrics to /metrics, formatted for prometheus.
 webService.use("/metrics", crow.prometheusExporter(express, metrics));
 
-// track heap used as a gauge, just for fun.
+// track heap-used as a gauge.
+// the function will be called on-demand, once a minute.
 metrics.setGauge("heap_used", function () { return process.memoryUsage().heapUsed; });
 
+// my website.
 webService.get("/", function (request, response) {
+  // count incoming requests:
   metrics.counter("request_count").increment();
 
+  // time how long it takes to respond:
   metrics.distribution("request_time_msec").time(function () {
     response.send("Hello!\n");
   });
@@ -59,7 +63,7 @@ webService.get("/", function (request, response) {
 
 Metrics consist of:
 
-- **counters**: things that only increase, like the number of requests handled since the server started.
+- **counters**: numbers that increase only (never decrease), like the number of requests handled since the server started.
 - **gauges**: dials that measure a changing state, like the number of currently open connections, or the amount of memory being used.
 - **distributions**: samples that are interesting for their histogram, like timings (95th percentile of database reads, for example).
 
