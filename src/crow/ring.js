@@ -1,5 +1,8 @@
 "use strict";
 
+const MetricType = require("./metrics").MetricType;
+const util = require("util");
+
 // one hour
 const DEFAULT_SPAN = 60 * 60 * 1000;
 
@@ -31,25 +34,31 @@ class RingBufferObserver {
   }
 
   toJson() {
-    let records = this.get();
+    const records = this.get();
 
-    let nameSet = {};
+    const nameSet = {};
     records.forEach((record) => {
       Object.keys(record.snapshot).forEach((name) => {
         if (name[0] != "@") nameSet[name] = true;
       });
     });
-    let names = Object.keys(nameSet).sort();
+    const names = Object.keys(nameSet).sort();
 
-    let json = { "@timestamp": [] };
+    const json = { "@timestamp": [] };
     names.forEach((name) => json[name] = []);
+    const previously = {};
 
     records.forEach((record) => {
-      let seen = {};
+      const seen = {};
       json["@timestamp"].push(record.timestamp);
       Object.keys(record.snapshot).forEach((name) => {
         if (name[0] != "@") {
-          json[name].push(record.snapshot[name]);
+          let value = record.snapshot[name];
+          if (record.snapshot["@types"][name] == MetricType.COUNTER) {
+            value = value - (previously[name] || 0);
+            previously[name] = record.snapshot[name];
+          }
+          json[name].push(value);
           seen[name] = true;
         }
       });

@@ -18,17 +18,24 @@ function metricName(i) {
 }
 
 class Gauge {
-  constructor(name, getter) {
+  constructor(name, fullname, tags, getter) {
     this.name = name;
+    this.fullname = fullname;
+    this.tags = tags;
     this.type = MetricType.GAUGE;
+    this.set(getter);
+  }
+
+  set(getter) {
     this.get = (typeof getter === "function") ? getter : (() => getter);
   }
 }
 
 class Counter {
-  constructor(registry, name, tags = {}) {
+  constructor(registry, name, fullname, tags = {}) {
     this.registry = registry;
     this.name = name;
+    this.fullname = fullname;
     this.tags = tags;
     this.type = MetricType.COUNTER;
     this.value = 0;
@@ -64,9 +71,10 @@ class Counter {
 }
 
 class Distribution {
-  constructor(registry, name, tags = {}, percentiles, error) {
+  constructor(registry, name, fullname, tags = {}, percentiles, error) {
     this.registry = registry;
     this.name = name;
+    this.fullname = fullname;
     this.tags = tags;
     this.percentiles = percentiles;
     this.error = error;
@@ -105,6 +113,7 @@ class Distribution {
       rv[this.registry._fullname(this.name, this.tags, { quantile: p })] = snapshot.getPercentile(p);
     });
     rv[this.registry._fullname(this.name + "_count", this.tags)] = snapshot.sampleCount;
+    rv[this.registry._fullname(this.name + "_sum", this.tags)] = snapshot.sampleSum;
     return rv;
   }
 

@@ -15,11 +15,12 @@ function refresh() {
       } else {
         currentValue = "(none)";
       }
+      var values = data[name].map(function (value) { return value == null ? 0 : value; });
       var graphDiv = $(".graph-template").clone();
       graphDiv.removeClass("graph-template");
       graphDiv.addClass("graph");
       graphDiv.children(".peity").remove();
-      graphDiv.children(".line").first().text(data[name].join(","));
+      graphDiv.children(".line").first().text(values.join(","));
       graphDiv.children(".value").first().text(currentValue);
       graphDiv.children(".name").first().text(name);
       graphsDiv.append(graphDiv);

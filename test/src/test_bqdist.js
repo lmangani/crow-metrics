@@ -41,6 +41,8 @@ function validate(dist, samples) {
   sorted.sort((a, b) => a - b);
   let snapshot = dist.resetWithSnapshot();
   dist.percentiles.forEach((p) => rankError(sorted, p, snapshot.getPercentile(p)).should.not.be.greaterThan(dist.error));
+  snapshot.sampleCount.should.eql(samples.length);
+  snapshot.sampleSum.should.eql(samples.reduce((a, b) => a + b));
 }
 
 describe("BiasedQuantileDistribution", () => {

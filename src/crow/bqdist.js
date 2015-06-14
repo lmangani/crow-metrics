@@ -7,6 +7,7 @@ class Snapshot {
   constructor(dist) {
     this.samples = dist.samples.slice();
     this.sampleCount = dist.sampleCount;
+    this.sampleSum = dist.sampleSum;
     this.deltasWithinBucket = dist.deltasWithinBucket.slice();
     this.deltasBetweenBuckets = dist.deltasBetweenBuckets.slice();
     this.percentiles = dist.percentiles;
@@ -53,6 +54,8 @@ class BiasedQuantileDistribution {
     this.deltasBetweenBuckets = []; // "g" in the paper*
     // total samples that there ever were (even the ones we dropped)
     this.sampleCount = 0;
+    // sum of all the samples that ever were
+    this.sampleSum = 0;
   }
 
   // * academics are not good at naming things.
@@ -73,6 +76,7 @@ class BiasedQuantileDistribution {
   // clear out any previously stored samples, and start over.
   reset() {
     this.sampleCount = 0;
+    this.sampleSum = 0;
     this.samples = [];
     this.deltasWithinBucket = [];
     this.deltasBetweenBuckets = [];
@@ -113,6 +117,7 @@ class BiasedQuantileDistribution {
         // insert!
         let uncertainty = si == 0 ? 0 : Math.floor(this.allowedRankError(rank - this.deltasBetweenBuckets[si - 1])) - 1;
         this.sampleCount += 1;
+        this.sampleSum += this.buffer[bi];
         this.samples.splice(si, 0, this.buffer[bi]);
         this.deltasBetweenBuckets.splice(si, 0, 1);
         this.deltasWithinBucket.splice(si, 0, uncertainty < 0 ? 0 : uncertainty);
