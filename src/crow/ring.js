@@ -33,6 +33,10 @@ class RingBufferObserver {
     return rv;
   }
 
+  getLatest() {
+    return this.buffer[(this.index + this.size - 1) % this.size];
+  }
+
   toJson() {
     const records = this.get();
 

@@ -19,6 +19,7 @@ describe("RingBufferObserver", () => {
     r.setGauge("speed", 35);
     r._publish();
     rb.toJson()["speed"].should.eql([ 45, 55, 35 ]);
+    rb.getLatest().snapshot.speed.should.eql(35);
   });
 
   it("tracks counters", () => {
@@ -34,6 +35,7 @@ describe("RingBufferObserver", () => {
     r.counter("bruises").increment();
     r._publish();
     rb.toJson()["bruises"].should.eql([ 2, 1, 0, 2 ]);
+    rb.getLatest().snapshot.bruises.should.eql(5);
   });
 
   it("tracks distributions", () => {
@@ -52,5 +54,7 @@ describe("RingBufferObserver", () => {
     json["timings_count"].should.eql([ 3, 3 ]);
     json["timings{quantile=\"0.5\"}"].should.eql([ 5, 4 ]);
     json["timings{quantile=\"0.9\"}"].should.eql([ 10, 6 ]);
+    rb.getLatest().snapshot.timings_count.should.eql(3);
+    rb.getLatest().snapshot["timings{quantile=\"0.5\"}"].should.eql(4);
   });
 });
