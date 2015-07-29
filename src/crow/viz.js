@@ -32,6 +32,12 @@ function viz(express, registry, span = ring.DEFAULT_SPAN) {
     response.send(observer.get());
   });
 
+  router.get("/current.json", (request, response) => {
+    const latest = observer.getLatest();
+    response.type("json");
+    response.send(latest.toJson());
+  });
+
   return router;
 }
 
