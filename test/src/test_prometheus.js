@@ -1,5 +1,6 @@
 "use strict";
 
+/*
 let crow = require("../../lib/crow");
 let should = require("should");
 let util = require("util");
@@ -69,3 +70,4 @@ describe("PrometheusObserver", () => {
     ]);
   });
 });
+*/
