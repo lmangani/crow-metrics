@@ -1,12 +1,11 @@
 {
   "name": "crow-metrics",
-  "version": "1.1.2",
+  "version": "2.0.0",
   "description": "small metrics collector for node",
   "keywords": [
     "metrics",
     "prometheus",
-    "servo",
-    "graphs"
+    "servo"
   ],
   "author": "Robey Pointer <robeypointer@gmail.com>",
   "repository": {
@@ -20,15 +19,21 @@
     }
   ],
   "scripts": {
+    "build": "eslint src test/src && npm run build-source && npm run build-test",
+    "build-source": "babel --source-maps --out-dir lib src",
+    "build-test": "babel --source-maps --out-dir test/lib test/src",
     "clean": "rm -rf lib",
-    "prepublish": "babel --source-maps --out-dir lib src && babel --source-maps --out-dir test/lib test/src",
+    "prepublish": "npm run build",
     "test": "mocha -R spec --colors test/lib --timeout 30000"
   },
   "dependencies": {
-    "bluebird": "*"
+    "bluebird": "latest"
   },
   "devDependencies": {
-    "babel": "*",
+    "babel": "^6.0.0",
+    "babel-cli": "^6.0.0",
+    "babel-preset-es2015-node4": "^1.0.0",
+    "eslint": "^1.4.1",
     "mocha": "*",
     "should": "*",
     "source-map-support": "*"

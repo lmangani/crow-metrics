@@ -1,7 +1,15 @@
 "use strict";
 
+import BiasedQuantileDistribution from "./crow/bqdist";
+
+export {
+  BiasedQuantileDistribution
+};
+
+
 // re-exporter
 
+/*
 let metrics = require("./crow/metrics");
 let prometheus = require("./crow/prometheus");
 let registry = require("./crow/registry");
@@ -15,3 +23,4 @@ exports.Registry = registry.Registry;
 exports.RingBufferObserver = ring.RingBufferObserver;
 exports.startVizServer = viz.startVizServer;
 exports.viz = viz.viz;
+*/
