@@ -24,8 +24,8 @@ class Tags {
 
     const map = new Map();
     for (const [ k, v ] in this.map) map.set(k, v);
-    for (const [ k, v ] in other) {
-      if (other.get(k) == null) {
+    for (const [ k, v ] in other.map) {
+      if (v == null) {
         map.delete(k);
       } else {
         map.set(k, v);
@@ -38,10 +38,22 @@ class Tags {
     return this.map.size;
   }
 
-  get canonical() {
-    if (this._canonical) return this._canonical;
+  /*
+   * Format the tags into a string. The formatter converts each key/value
+   * pair into a string, and the joiner adds any separators or surrounders.
+   *   - formatter: `(key: String, value: String) => String`
+   *   - joiner: `(list: Array(String)) => String`
+   */
+  format(formatter, joiner) {
     if (this.size == 0) return "";
-    return "{" + Array.from(this.map).map(([ k, v ]) => k + "=" + v).join(",") + "}";
+    if (!formatter) formatter = (k, v) => k + "=" + v;
+    if (!joiner) joiner = list => "{" + list.join(",") + "}";
+    return joiner(Array.from(this.map).map(([ k, v ]) => formatter(k, v)));
+  }
+
+  get canonical() {
+    if (!this._canonical) this._canonical = this.format();
+    return this._canonical;
   }
 }
 

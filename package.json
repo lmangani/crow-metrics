@@ -12,17 +12,13 @@
     "type": "git",
     "url": "git@github.com:robey/node-crow.git"
   },
-  "licenses": [
-    {
-      "type": "Apache License 2.0",
-      "url": "http://www.apache.org/licenses/LICENSE-2.0.txt"
-    }
-  ],
+  "license": "Apache-2.0",
   "scripts": {
     "build": "eslint src test/src && npm run build-source && npm run build-test",
     "build-source": "babel --source-maps --out-dir lib src",
     "build-test": "babel --source-maps --out-dir test/lib test/src",
     "clean": "rm -rf lib",
+    "distclean": "npm run clean && rm -rf node_modules npm-debug.log",
     "prepublish": "npm run build",
     "test": "mocha -R spec --colors test/lib --timeout 30000"
   },
@@ -34,9 +30,12 @@
     "babel-cli": "^6.0.0",
     "babel-preset-es2015-node4": "^1.0.0",
     "eslint": "^1.4.1",
-    "mocha": "*",
-    "should": "*",
-    "source-map-support": "*"
+    "mocha": "latest",
+    "should": "latest",
+    "source-map-support": "latest"
+  },
+  "engines": {
+    "node": ">=4.2.0"
   },
   "main": "./lib/crow",
   "files": [

@@ -1,9 +1,12 @@
 "use strict";
 
+import Counter from "./metrics/counter";
+import Gauge from "./metrics/gauge";
 import makeTags from "./metrics/tags";
+import Snapshot from "./snapshot";
 
-// let DEFAULT_PERCENTILES = [ 0.5, 0.9, 0.99 ];
-// let DEFAULT_ERROR = 0.01;
+const DEFAULT_PERCENTILES = [ 0.5, 0.9, 0.99 ];
+const DEFAULT_ERROR = 0.01;
 
 
 /*
@@ -93,62 +96,53 @@ export default class Registry {
 //   addObserver(observer) {
 //     this.observers.push(observer);
 //   }
-//
-//   /*
-//    * Grab a snapshot of the current value of each metric.
-//    * Distributions will be reset.
-//    */
-//   _snapshot() {
-//     let rv = { "@types": {} };
-//     for (let key in this.metrics) {
-//       let metric = this.metrics[key];
-//       rv["@types"][metric.name] = metric.type;
-//       rv["@types"][metric.fullname] = metric.type;
-//       switch (metric.type) {
-//         case MetricType.DISTRIBUTION:
-//           let stats = this.metrics[key].get();
-//           for (let key in stats) rv[key] = stats[key];
-//           break;
-//         default:
-//           rv[key] = this.metrics[key].get();
-//       }
-//     }
-//     return rv;
-//   }
+
+  /*
+   * Return a snapshot of the current value of each metric.
+   * Distributions will be reset.
+   */
+  snapshot() {
+    const timestamp = Date.now();
+    const map = new Map();
+    for (const metric of this.metrics.values()) {
+      map.set(metric, metric.value);
+    }
+    return new Snapshot(timestamp, map);
+  }
 
   /*
    * Fetch the counter with a given name (and optional tags).
    * If no counter by that name/tag combination exists, it's created.
    */
   counter(name, tags = null) {
-    return this._getOrMake(name, mergeDefaults(tags, this.tags), MetricType.COUNTER, (name, fullname, tags) => new metrics.Counter(this, name, fullname, tags));
+    return this._getOrMake(name, tags, Counter, (name, tags) => new Counter(this, name, tags));
   }
 
-//   /*
-//    * Fetch the gauge with a given name (and optional tags).
-//    * If no gauge by that name/tag combination exists, an exception is thrown.
-//    */
-//   gauge(name, tags = {}) {
-//     return this._getOrMake(name, mergeDefaults(tags, this.tags), MetricType.GAUGE, (name, fullname, tags) => {
-//       throw new Error("No such metric");
-//     });
-//   }
-//
-//   /*
-//    * Add (or replace) a gauge with the given name (and optional tags).
-//    * The getter is normally a function that computes the value on demand,
-//    * but if the value changes rarely or never, you may use a constant value
-//    * instead.
-//    */
-//   setGauge(name, tags = {}, getter) {
-//     if (getter === undefined) {
-//       // addGauge(name, getter)
-//       getter = tags;
-//       tags = {};
-//     }
-//     return this._getOrMake(name, mergeDefaults(tags, this.tags), MetricType.GAUGE, (name, fullname, tags) => new metrics.Gauge(name, fullname, tags, getter)).set(getter);
-//   }
-//
+  /*
+   * Fetch the gauge with a given name (and optional tags).
+   * If no gauge by that name/tag combination exists, an exception is thrown.
+   */
+  gauge(name, tags = null) {
+    return this._getOrMake(name, tags, Gauge, () => {
+      throw new Error("No such metric");
+    });
+  }
+
+  /*
+   * Add (or replace) a gauge with the given name (and optional tags).
+   * The getter is normally a function that computes the value on demand,
+   * but if the value changes rarely or never, you may use a constant value
+   * instead.
+   */
+  setGauge(name, tags = null, getter) {
+    if (getter === undefined) {
+      // addGauge(name, getter)
+      getter = tags;
+      tags = null;
+    }
+    return this._getOrMake(name, tags, Gauge, (name, tags) => new Gauge(name, tags, getter)).set(getter);
+  }
+
 //   /*
 //    * Fetch the distribution with a given name (and optional tags).
 //    * If no distribution by that name/tag combination exists, it's generated.
@@ -176,25 +170,19 @@ export default class Registry {
 
   // maker: (name, tags) => metric object
   _getOrMake(name, tags, type, maker) {
-    let fullname = this._fullname(name, tags);
-    let metric = this.metrics[fullname];
+    tags = this.tags.merge(makeTags(tags));
+    const fullname = name + tags.canonical;
+    let metric = this.metrics.get(fullname);
     if (metric !== undefined) {
-      if (metric.type != type) throw new Error(`${fullname} is already a ${metrics.metricName(metric.type).toLowerCase()}`);
+      if (metric.constructor != type) {
+        throw new Error(`${fullname} is already a ${type.name.toLowerCase()}`);
+      }
       return metric;
     }
-    metric = maker(name, fullname, tags);
-    this.metrics[fullname] = metric;
+    metric = maker(name, tags);
+    this.metrics.set(fullname, metric);
     return metric;
   }
-
-//   _fullname(name, tags, extraTags = {}) {
-//     let keys = Object.keys(tags).sort();
-//     let extraKeys = Object.keys(extraTags).sort();
-//     if (keys.length == 0 && extraKeys.length == 0) return name;
-//     let fields = keys.map((key) => `${key}="${tags[key]}"`);
-//     if (extraKeys.length > 0) fields = fields.concat(extraKeys.map((key) => `${key}="${extraTags[key]}"`));
-//     return name + "{" + fields.join(",") + "}";
-//   }
 }
 
 // function mergeDefaults(tags, defaults) {
