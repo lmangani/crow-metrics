@@ -1,5 +1,6 @@
 "use strict";
 
+import Distribution from "./metrics/distribution";
 import Counter from "./metrics/counter";
 import Gauge from "./metrics/gauge";
 import makeTags from "./metrics/tags";
@@ -68,34 +69,35 @@ export default class Registry {
     setTimeout(() => this._publish(), duration);
   }
 
-//   _publish() {
-//     this.lastPublish = Date.now();
-//     let snapshot = this._snapshot();
-//     if (this.log) this.log.trace(`Publishing ${Object.keys(this.metrics).length} metrics to ${this.observers.length} observers.`);
-//
-//     this.observers.forEach((observer) => {
-//       try {
-//         observer(this.lastPublish, snapshot);
-//       } catch (error) {
-//         if (this.log) this.log.error({ error: error }, "Error in crow observer (skipping)");
-//       }
-//     });
-//
-//     this._schedulePublish();
-//   }
-//
-//   /*
-//    * Add an observer, which should be a function:
-//    *
-//    *     function observer(timestamp, snapshot)
-//    *
-//    * The timestamp is in milliseconds, and the snapshot is an object with
-//    * fully-qualified metric names as the keys, and numbers as the values.
-//    * For example: `{ "requests_served": 10 }`
-//    */
-//   addObserver(observer) {
-//     this.observers.push(observer);
-//   }
+  _publish() {
+    const snapshot = this.snapshot();
+    this.lastPublish = snapshot.timestamp;
+    if (this.log) {
+      this.log.trace(`Publishing ${this.metrics.size} metrics to ${this.observers.length} observers.`);
+    }
+
+    this.observers.forEach(observer => {
+      try {
+        observer(snapshot);
+      } catch (error) {
+        if (this.log) this.log.error({ error: error }, "Error in crow observer (skipping)");
+      }
+    });
+
+    this._schedulePublish();
+  }
+
+  /*
+   * Add an observer, which should be a function:
+   *
+   *     function observer(snapshot)
+   *
+   * The snapshot is an object with a timestamp and a map of metrics to
+   * values. (See `Snapshot` for details.)
+   */
+  addObserver(observer) {
+    this.observers.push(observer);
+  }
 
   /*
    * Return a snapshot of the current value of each metric.
@@ -143,30 +145,32 @@ export default class Registry {
     return this._getOrMake(name, tags, Gauge, (name, tags) => new Gauge(name, tags, getter)).set(getter);
   }
 
-//   /*
-//    * Fetch the distribution with a given name (and optional tags).
-//    * If no distribution by that name/tag combination exists, it's generated.
-//    */
-//   distribution(name, tags = {}, percentiles = this.percentiles, error = this.error) {
-//     return this._getOrMake(name, mergeDefaults(tags, this.tags), MetricType.DISTRIBUTION, (name, fullname, tags) => {
-//       return new metrics.Distribution(this, name, fullname, tags, percentiles, error);
-//     });
-//   }
-//
-//   /*
-//    * Return a new registry-like object that has accessors for metrics, but
-//    * prefixes all names with `(prefix)_`.
-//    */
-//   withPrefix(prefix) {
-//     return {
-//       counter: (name, tags) => this.counter(`${prefix}${this.separator}${name}`, tags),
-//       gauge: (name, tags) => this.gauge(`${prefix}${this.separator}${name}`, tags),
-//       setGauge: (name, tags, getter) => this.setGauge(`${prefix}${this.separator}${name}`, tags, getter),
-//       distribution: (name, tags, percentiles, error) => this.distribution(`${prefix}${this.separator}${name}`, tags, percentiles, error),
-//       withPrefix: (nextPrefix) => this.withPrefix(`${prefix}${this.separator}${nextPrefix}`),
-//       addObserver: (x) => this.addObserver(x)
-//     };
-//   }
+  /*
+   * Fetch the distribution with a given name (and optional tags).
+   * If no distribution by that name/tag combination exists, it's generated.
+   */
+  distribution(name, tags = null, percentiles = this.percentiles, error = this.error) {
+    return this._getOrMake(name, tags, Distribution, (name, tags) => {
+      return new Distribution(this, name, tags, percentiles, error);
+    });
+  }
+
+  /*
+   * Return a new registry-like object that has accessors for metrics, but
+   * prefixes all names with `(prefix)_`.
+   */
+  withPrefix(prefix) {
+    return {
+      counter: (name, tags) => this.counter(`${prefix}${this.separator}${name}`, tags),
+      gauge: (name, tags) => this.gauge(`${prefix}${this.separator}${name}`, tags),
+      setGauge: (name, tags, getter) => this.setGauge(`${prefix}${this.separator}${name}`, tags, getter),
+      distribution: (name, tags, percentiles, error) => {
+        return this.distribution(`${prefix}${this.separator}${name}`, tags, percentiles, error);
+      },
+      withPrefix: (nextPrefix) => this.withPrefix(`${prefix}${this.separator}${nextPrefix}`),
+      addObserver: (x) => this.addObserver(x)
+    };
+  }
 
   // maker: (name, tags) => metric object
   _getOrMake(name, tags, type, maker) {
@@ -175,7 +179,7 @@ export default class Registry {
     let metric = this.metrics.get(fullname);
     if (metric !== undefined) {
       if (metric.constructor != type) {
-        throw new Error(`${fullname} is already a ${type.name.toLowerCase()}`);
+        throw new Error(`${fullname} is already a ${metric.constructor.name.toLowerCase()}`);
       }
       return metric;
     }
@@ -184,10 +188,3 @@ export default class Registry {
     return metric;
   }
 }
-
-// function mergeDefaults(tags, defaults) {
-//   for (let key in defaults) {
-//     if (tags[key] === undefined) tags[key] = defaults[key];
-//   }
-//   return tags;
-// }

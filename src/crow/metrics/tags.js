@@ -10,8 +10,12 @@
  */
 class Tags {
   constructor(obj) {
-    this.map = new Map();
-    for (const key in obj) this.map.set(key, obj[key]);
+    if (obj instanceof Map) {
+      this.map = obj;
+    } else {
+      this.map = new Map();
+      for (const key in obj) this.map.set(key, obj[key]);
+    }
   }
 
   /*
@@ -23,8 +27,8 @@ class Tags {
     other = makeTags(other);
 
     const map = new Map();
-    for (const [ k, v ] in this.map) map.set(k, v);
-    for (const [ k, v ] in other.map) {
+    for (const [ k, v ] of this.map) map.set(k, v);
+    for (const [ k, v ] of other.map) {
       if (v == null) {
         map.delete(k);
       } else {
@@ -48,7 +52,7 @@ class Tags {
     if (this.size == 0) return "";
     if (!formatter) formatter = (k, v) => k + "=" + v;
     if (!joiner) joiner = list => "{" + list.join(",") + "}";
-    return joiner(Array.from(this.map).map(([ k, v ]) => formatter(k, v)));
+    return joiner(Array.from(this.map).map(([ k, v ]) => formatter(k, v)).sort());
   }
 
   get canonical() {
