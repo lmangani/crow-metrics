@@ -2,6 +2,8 @@
 
 <img src="docs/crow-small.png" align="right">
 
+## WARNING: This module is in flux for v2.0. I'm pushing it to npm so that I can do integration testing, but it may not be stable yet.
+
 Crow is a library for collecting metrics about your server, similar to Twitter's Ostrich or Netflix's Servo.(\*) It helps you track things like:
 
 - How many requests am I handling per second?

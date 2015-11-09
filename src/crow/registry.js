@@ -1,12 +1,14 @@
 "use strict";
 
-let metrics = require("./metrics");
-let util = require("util");
+import Distribution from "./metrics/distribution";
+import Counter from "./metrics/counter";
+import Gauge from "./metrics/gauge";
+import makeTags from "./metrics/tags";
+import Snapshot from "./snapshot";
 
-let DEFAULT_PERCENTILES = [ 0.5, 0.9, 0.99 ];
-let DEFAULT_ERROR = 0.01;
+const DEFAULT_PERCENTILES = [ 0.5, 0.9, 0.99 ];
+const DEFAULT_ERROR = 0.01;
 
-let MetricType = metrics.MetricType;
 
 /*
  * The registry is the central coordinator for metrics collection and
@@ -14,30 +16,30 @@ let MetricType = metrics.MetricType;
  * takes a snapshot and sends it to any observers. (A typical observer might
  * push the metrics into riemann, influxdb, or prometheus.)
  *
+ * Each metric object contains:
+ *   - name
+ *   - tags
+ *   - value: Number or Map(String -> Number)
+ *
  * options:
- * - period: (msec) how often to send snapshots to observers
- * - percentiles: (array) default percentiles to track on distributions
- * - error: (number) default error to allow on distribution ranks
- * - log: bunyan logger for debugging
- * - tags: (object) default tags to apply to each metric
- * - separator: (string) what to use in `withPrefix`; default is "_"
+ *   - period: (msec) how often to send snapshots to observers
+ *   - percentiles: (array) default percentiles to track on distributions
+ *   - error: (number) default error to allow on distribution ranks
+ *   - log: bunyan logger for debugging
+ *   - tags: (object) default tags to apply to each metric
+ *   - separator: (string) what to use in `withPrefix`; default is "_"
  */
-class Registry {
-  /*
-   * Each metric is stored by its fully-qualified name in `metrics`. For
-   * example, a counter named "buckets" with a tag of cats="yes" is stored
-   * by `buckets{cats="yes"}`.
-   */
+export default class Registry {
   constructor(options = {}) {
-    // i want to use Map here, but Map's polyfill is busted.
-    this.metrics = {};
+    // metrics are stored by their "fully-qualified" name, using stringified tags.
+    this.metrics = new Map();
     this.observers = [];
     this.period = options.period || 60000;
     this.percentiles = options.percentiles || DEFAULT_PERCENTILES;
     this.error = options.error || DEFAULT_ERROR;
     this.log = options.log;
     this.lastPublish = Date.now();
-    this.tags = options.tags || {};
+    this.tags = makeTags(options.tags);
     this.separator = options.separator || "_";
 
     // if the period is a multiple of minute, 30 sec, 5 sec, or 1 sec, then
@@ -51,27 +53,36 @@ class Registry {
 
     this._schedulePublish();
 
-    const packageInfo = require("../../package.json");
-    if (this.log) this.log.info(`crow-metrics ${packageInfo.version} started; period_sec=${this.period / 1000}`);
+    this.version = "?";
+    try {
+      this.version = require("../../package.json").version;
+    } catch (error) {
+      // don't worry about it.
+    }
+    if (this.log) this.log.info(`crow-metrics ${this.version} started; period_sec=${this.period / 1000}`);
   }
 
   _schedulePublish() {
-    let nextTime = Math.round((this.lastPublish + this.period) / this.periodRounding) * this.periodRounding;
+    const nextTime = Math.round((this.lastPublish + this.period) / this.periodRounding) * this.periodRounding;
     let duration = nextTime - Date.now();
     while (duration < 0) duration += this.period;
     setTimeout(() => this._publish(), duration);
   }
 
   _publish() {
-    this.lastPublish = Date.now();
-    let snapshot = this._snapshot();
-    if (this.log) this.log.trace(`Publishing ${Object.keys(this.metrics).length} metrics to ${this.observers.length} observers.`);
+    const snapshot = this.snapshot();
+    this.lastPublish = snapshot.timestamp;
+    if (this.log) {
+      this.log.trace(`Publishing ${this.metrics.size} metrics to ${this.observers.length} observers.`);
+    }
 
-    this.observers.forEach((observer) => {
+    this.observers.forEach(observer => {
       try {
-        observer(this.lastPublish, snapshot);
+        observer(snapshot);
       } catch (error) {
-        if (this.log) this.log.error({ error: error }, "Error in crow observer (skipping)");
+        if (this.log) this.log.error({ err: error }, "Error in crow observer (skipping)");
+        // there may be no other way for someone to see there was an error:
+        console.log(error.stack);
       }
     });
 
@@ -81,52 +92,42 @@ class Registry {
   /*
    * Add an observer, which should be a function:
    *
-   *     function observer(timestamp, snapshot)
+   *     function observer(snapshot)
    *
-   * The timestamp is in milliseconds, and the snapshot is an object with
-   * fully-qualified metric names as the keys, and numbers as the values.
-   * For example: `{ "requests_served": 10 }`
+   * The snapshot is an object with a timestamp and a map of metrics to
+   * values. (See `Snapshot` for details.)
    */
   addObserver(observer) {
     this.observers.push(observer);
   }
 
   /*
-   * Grab a snapshot of the current value of each metric.
+   * Return a snapshot of the current value of each metric.
    * Distributions will be reset.
    */
-  _snapshot() {
-    let rv = { "@types": {} };
-    for (let key in this.metrics) {
-      let metric = this.metrics[key];
-      rv["@types"][metric.name] = metric.type;
-      rv["@types"][metric.fullname] = metric.type;
-      switch (metric.type) {
-        case MetricType.DISTRIBUTION:
-          let stats = this.metrics[key].get();
-          for (let key in stats) rv[key] = stats[key];
-          break;
-        default:
-          rv[key] = this.metrics[key].get();
-      }
+  snapshot() {
+    const timestamp = Date.now();
+    const map = new Map();
+    for (const metric of this.metrics.values()) {
+      map.set(metric, metric.value);
     }
-    return rv;
+    return new Snapshot(timestamp, map);
   }
 
   /*
    * Fetch the counter with a given name (and optional tags).
    * If no counter by that name/tag combination exists, it's created.
    */
-  counter(name, tags = {}) {
-    return this._getOrMake(name, mergeDefaults(tags, this.tags), MetricType.COUNTER, (name, fullname, tags) => new metrics.Counter(this, name, fullname, tags));
+  counter(name, tags = null) {
+    return this._getOrMake(name, tags, Counter, (name, tags) => new Counter(this, name, tags));
   }
 
   /*
    * Fetch the gauge with a given name (and optional tags).
    * If no gauge by that name/tag combination exists, an exception is thrown.
    */
-  gauge(name, tags = {}) {
-    return this._getOrMake(name, mergeDefaults(tags, this.tags), MetricType.GAUGE, (name, fullname, tags) => {
+  gauge(name, tags = null) {
+    return this._getOrMake(name, tags, Gauge, () => {
       throw new Error("No such metric");
     });
   }
@@ -137,22 +138,22 @@ class Registry {
    * but if the value changes rarely or never, you may use a constant value
    * instead.
    */
-  setGauge(name, tags = {}, getter) {
+  setGauge(name, tags = null, getter) {
     if (getter === undefined) {
       // addGauge(name, getter)
       getter = tags;
-      tags = {};
+      tags = null;
     }
-    return this._getOrMake(name, mergeDefaults(tags, this.tags), MetricType.GAUGE, (name, fullname, tags) => new metrics.Gauge(name, fullname, tags, getter)).set(getter);
+    return this._getOrMake(name, tags, Gauge, (name, tags) => new Gauge(name, tags, getter)).set(getter);
   }
 
   /*
    * Fetch the distribution with a given name (and optional tags).
    * If no distribution by that name/tag combination exists, it's generated.
    */
-  distribution(name, tags = {}, percentiles = this.percentiles, error = this.error) {
-    return this._getOrMake(name, mergeDefaults(tags, this.tags), MetricType.DISTRIBUTION, (name, fullname, tags) => {
-      return new metrics.Distribution(this, name, fullname, tags, percentiles, error);
+  distribution(name, tags = null, percentiles = this.percentiles, error = this.error) {
+    return this._getOrMake(name, tags, Distribution, (name, tags) => {
+      return new Distribution(this, name, tags, percentiles, error);
     });
   }
 
@@ -165,42 +166,27 @@ class Registry {
       counter: (name, tags) => this.counter(`${prefix}${this.separator}${name}`, tags),
       gauge: (name, tags) => this.gauge(`${prefix}${this.separator}${name}`, tags),
       setGauge: (name, tags, getter) => this.setGauge(`${prefix}${this.separator}${name}`, tags, getter),
-      distribution: (name, tags, percentiles, error) => this.distribution(`${prefix}${this.separator}${name}`, tags, percentiles, error),
+      distribution: (name, tags, percentiles, error) => {
+        return this.distribution(`${prefix}${this.separator}${name}`, tags, percentiles, error);
+      },
       withPrefix: (nextPrefix) => this.withPrefix(`${prefix}${this.separator}${nextPrefix}`),
       addObserver: (x) => this.addObserver(x)
     };
   }
 
-  // maker: (name, fullname, tags) => metric object
+  // maker: (name, tags) => metric object
   _getOrMake(name, tags, type, maker) {
-    let fullname = this._fullname(name, tags);
-    let metric = this.metrics[fullname];
+    tags = this.tags.merge(makeTags(tags));
+    const fullname = name + tags.canonical;
+    let metric = this.metrics.get(fullname);
     if (metric !== undefined) {
-      if (metric.type != type) throw new Error(`${fullname} is already a ${metrics.metricName(metric.type).toLowerCase()}`);
+      if (metric.constructor != type) {
+        throw new Error(`${fullname} is already a ${metric.constructor.name.toLowerCase()}`);
+      }
       return metric;
     }
-    metric = maker(name, fullname, tags);
-    this.metrics[fullname] = metric;
+    metric = maker(name, tags);
+    this.metrics.set(fullname, metric);
     return metric;
   }
-
-  _fullname(name, tags, extraTags = {}) {
-    let keys = Object.keys(tags).sort();
-    let extraKeys = Object.keys(extraTags).sort();
-    if (keys.length == 0 && extraKeys.length == 0) return name;
-    let fields = keys.map((key) => `${key}="${tags[key]}"`);
-    if (extraKeys.length > 0) fields = fields.concat(extraKeys.map((key) => `${key}="${extraTags[key]}"`));
-    return name + "{" + fields.join(",") + "}";
-  }
 }
-
-function mergeDefaults(tags, defaults) {
-  for (let key in defaults) {
-    if (tags[key] === undefined) tags[key] = defaults[key];
-  }
-  return tags;
-}
-
-
-exports.MetricType = MetricType;
-exports.Registry = Registry;

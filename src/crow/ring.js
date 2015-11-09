@@ -1,13 +1,10 @@
 "use strict";
 
-const MetricType = require("./metrics").MetricType;
-const util = require("util");
-
 // one hour
 const DEFAULT_SPAN = 60 * 60 * 1000;
 
 // store metrics in a ring buffer for some amount of time (by default, one hour)
-class RingBufferObserver {
+export default class RingBufferObserver {
   constructor(registry, span = DEFAULT_SPAN) {
     this.span = span;
     if (registry != null) this.register(registry);
@@ -18,16 +15,16 @@ class RingBufferObserver {
     this.buffer = new Array(this.size);
     this.index = 0;
 
-    registry.addObserver((timestamp, snapshot) => {
-      this.buffer[this.index] = { timestamp, snapshot };
+    registry.addObserver(snapshot => {
+      this.buffer[this.index] = snapshot;
       this.index = (this.index + 1) % this.size;
     });
   }
 
   get() {
-    let rv = [];
+    const rv = [];
     for (let i = 0; i < this.size; i++) {
-      let record = this.buffer[(this.index + i + 1) % this.size];
+      const record = this.buffer[(this.index + i + 1) % this.size];
       if (record) rv.push(record);
     }
     return rv;
@@ -40,41 +37,35 @@ class RingBufferObserver {
   toJson() {
     const records = this.get();
 
-    const nameSet = {};
-    records.forEach((record) => {
-      Object.keys(record.snapshot).forEach((name) => {
-        if (name[0] != "@") nameSet[name] = true;
-      });
+    const nameSet = new Set();
+    records.forEach(record => {
+      for (const name of record.flatten().keys()) nameSet.add(name);
     });
-    const names = Object.keys(nameSet).sort();
+    const names = Array.from(nameSet).sort();
 
     const json = { "@timestamp": [] };
-    names.forEach((name) => json[name] = []);
-    const previously = {};
+    names.forEach(name => json[name] = []);
+    const previousCounters = new Map();
 
-    records.forEach((record) => {
-      const seen = {};
+    records.forEach(record => {
+      const seen = new Set();
       json["@timestamp"].push(record.timestamp);
-      Object.keys(record.snapshot).forEach((name) => {
-        if (name[0] != "@") {
-          let value = record.snapshot[name];
-          if (record.snapshot["@types"][name] == MetricType.COUNTER) {
-            value = value - (previously[name] || 0);
-            previously[name] = record.snapshot[name];
-          }
+      for (const [ name, { value, type } ] of record.flatten()) {
+        seen.add(name);
+        if (type == "counter") {
+          // skip first data point so we can report deltas instead.
+          const previous = previousCounters.get(name);
+          json[name].push(previous ? value - previous : null);
+          previousCounters.set(name, value);
+        } else {
           json[name].push(value);
-          seen[name] = true;
         }
-      });
-      names.forEach((name) => {
-        if (!seen[name]) json[name].push(null);
+      }
+      names.forEach(name => {
+        if (!seen.has(name)) json[name].push(null);
       });
     });
 
     return json;
   }
 }
-
-
-exports.DEFAULT_SPAN = DEFAULT_SPAN;
-exports.RingBufferObserver = RingBufferObserver;

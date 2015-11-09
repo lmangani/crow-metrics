@@ -1,7 +1,5 @@
 "use strict";
 
-let util = require("util");
-
 // immutable snapshot of the samples, for calculating percentiles.
 class Snapshot {
   constructor(dist) {
@@ -16,11 +14,11 @@ class Snapshot {
 
   getPercentile(percentile) {
     if (this.samples.length == 0) return 0;
-    let desiredRank = Math.floor(this.sampleCount * percentile);
-    let desiredMaxError = computeAllowedRankError(this.percentiles, this.error, this.sampleCount, desiredRank) / 2;
+    const desiredRank = Math.floor(this.sampleCount * percentile);
+    const desiredMaxError = computeAllowedRankError(this.percentiles, this.error, this.sampleCount, desiredRank) / 2;
     let rank = 0;
     let i = 1;
-    let nextRank = (i) => {
+    const nextRank = i => {
       return rank + this.deltasBetweenBuckets[i] + this.deltasWithinBucket[i];
     };
     while (i < this.samples.length && nextRank(i) <= desiredRank + desiredMaxError) {
@@ -42,7 +40,7 @@ class Snapshot {
  * - percentiles: list of desired percentiles (median = 0.5)
  * - error: error allowed in the rank of the reported measurement
  */
-class BiasedQuantileDistribution {
+export default class BiasedQuantileDistribution {
   constructor(percentiles = [ 0.5, 0.9, 0.95 ], error = 0.01) {
     this.percentiles = percentiles;
     this.error = error;
@@ -68,7 +66,7 @@ class BiasedQuantileDistribution {
 
   // clear the samples, returning a snapshot of the previous results.
   resetWithSnapshot() {
-    let rv = this.snapshot();
+    const rv = this.snapshot();
     this.reset();
     return rv;
   }
@@ -93,18 +91,18 @@ class BiasedQuantileDistribution {
   // merge-sort the buffer into the existing samples, dropping unneeded ones.
   flush() {
     this.buffer.sort((a, b) => a - b);
-    let bufferLength = this.buffer.length;
+    const bufferLength = this.buffer.length;
 
     let rank = 0;
     let bi = 0;
     let si = 0;
 
-    let bucketsCompactable = () => {
-      let combinedRankError = this.deltasBetweenBuckets[si] +
+    const bucketsCompactable = () => {
+      const combinedRankError = this.deltasBetweenBuckets[si] +
         this.deltasBetweenBuckets[si + 1] +
         this.deltasWithinBucket[si + 1];
       return combinedRankError <= Math.floor(this.allowedRankError(rank));
-    }
+    };
 
     while (bi < bufferLength || si < this.samples.length) {
       if (si > 0 && si + 1 < this.samples.length && bucketsCompactable()) {
@@ -115,7 +113,9 @@ class BiasedQuantileDistribution {
         this.deltasWithinBucket.splice(si, 1);
       } else if (bi < bufferLength && (si == this.samples.length || this.samples[si] >= this.buffer[bi])) {
         // insert!
-        let uncertainty = si == 0 ? 0 : Math.floor(this.allowedRankError(rank - this.deltasBetweenBuckets[si - 1])) - 1;
+        const uncertainty = si == 0 ?
+          0 :
+          Math.floor(this.allowedRankError(rank - this.deltasBetweenBuckets[si - 1])) - 1;
         this.sampleCount += 1;
         this.sampleSum += this.buffer[bi];
         this.samples.splice(si, 0, this.buffer[bi]);
@@ -137,7 +137,7 @@ class BiasedQuantileDistribution {
 }
 
 function computeAllowedRankError(percentiles, error, sampleCount, rank) {
-  return Math.min(...percentiles.map((p) => {
+  return Math.min(...percentiles.map(p => {
     if (rank <= p * sampleCount) {
       return rank / p;
     } else {
@@ -145,6 +145,3 @@ function computeAllowedRankError(percentiles, error, sampleCount, rank) {
     }
   })) * 2 * error;
 }
-
-
-exports.BiasedQuantileDistribution = BiasedQuantileDistribution;
