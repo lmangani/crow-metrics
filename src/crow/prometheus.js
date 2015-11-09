@@ -1,8 +1,5 @@
 "use strict";
 
-// import { Registry } from "./registry";
-
-
 /*
  * observer that latches results into a text buffer suitable for sending
  * to prometheus (in a web server you host).

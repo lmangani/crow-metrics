@@ -4,7 +4,7 @@ import path from "path";
 import { RingBufferObserver } from "./ring";
 
 // find our static folder -> ./lib/crow/viz/viz.js -> ./static
-const staticPath = path.resolve(require.resolve("../crow"), "../../static");
+const staticPath = path.resolve(require.resolve(".."), "../../static");
 
 /*
  * create a sub-path on your existing web server for displaying per-server

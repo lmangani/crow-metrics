@@ -80,7 +80,7 @@ export default class Registry {
       try {
         observer(snapshot);
       } catch (error) {
-        if (this.log) this.log.error({ error: error }, "Error in crow observer (skipping)");
+        if (this.log) this.log.error({ err: error }, "Error in crow observer (skipping)");
       }
     });
 
