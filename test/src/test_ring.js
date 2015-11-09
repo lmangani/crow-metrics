@@ -1,6 +1,6 @@
 "use strict";
 
-import { Registry } from "../../lib";
+import { Registry, RingBufferObserver } from "../../lib";
 // const Promise = require("bluebird");
 // const ring = require("../../lib/crow/ring");
 

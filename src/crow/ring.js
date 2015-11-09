@@ -4,7 +4,7 @@
 const DEFAULT_SPAN = 60 * 60 * 1000;
 
 // store metrics in a ring buffer for some amount of time (by default, one hour)
-class RingBufferObserver {
+export default class RingBufferObserver {
   constructor(registry, span = DEFAULT_SPAN) {
     this.span = span;
     if (registry != null) this.register(registry);
@@ -22,9 +22,9 @@ class RingBufferObserver {
   }
 
   get() {
-    let rv = [];
+    const rv = [];
     for (let i = 0; i < this.size; i++) {
-      let record = this.buffer[(this.index + i + 1) % this.size];
+      const record = this.buffer[(this.index + i + 1) % this.size];
       if (record) rv.push(record);
     }
     return rv;
@@ -50,8 +50,8 @@ class RingBufferObserver {
     records.forEach(record => {
       const seen = new Set();
       json["@timestamp"].push(record.timestamp);
-      for (const [ key, { value, type } ] in record.flatten()) {
-        seen.add(key);
+      for (const [ name, { value, type } ] in record.flatten()) {
+        seen.add(name);
         if (type == "counter") {
           // skip first data point so we can report deltas instead.
           const previous = previously.get(name);
