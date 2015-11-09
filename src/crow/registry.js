@@ -81,6 +81,8 @@ export default class Registry {
         observer(snapshot);
       } catch (error) {
         if (this.log) this.log.error({ err: error }, "Error in crow observer (skipping)");
+        // there may be no other way for someone to see there was an error:
+        console.log(error.stack);
       }
     });
 
