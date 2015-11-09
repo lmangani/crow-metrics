@@ -39,24 +39,24 @@ export default class RingBufferObserver {
 
     const nameSet = new Set();
     records.forEach(record => {
-      for (const name in record.snapshot.flatten().keys()) nameSet.add(name);
+      for (const name of record.flatten().keys()) nameSet.add(name);
     });
     const names = Array.from(nameSet).sort();
 
     const json = { "@timestamp": [] };
     names.forEach(name => json[name] = []);
-    const previously = new Map();
+    const previousCounters = new Map();
 
     records.forEach(record => {
       const seen = new Set();
       json["@timestamp"].push(record.timestamp);
-      for (const [ name, { value, type } ] in record.flatten()) {
+      for (const [ name, { value, type } ] of record.flatten()) {
         seen.add(name);
         if (type == "counter") {
           // skip first data point so we can report deltas instead.
-          const previous = previously.get(name);
+          const previous = previousCounters.get(name);
           json[name].push(previous ? value - previous : null);
-          previous.set(name, value);
+          previousCounters.set(name, value);
         } else {
           json[name].push(value);
         }
