@@ -2,13 +2,11 @@
 
 <img src="docs/crow-small.png" align="right">
 
-## WARNING: This module is in flux for v2.0. I'm pushing it to npm so that I can do integration testing, but it may not be stable yet.
-
 Crow is a library for collecting metrics about your server, similar to Twitter's Ostrich or Netflix's Servo.(\*) It helps you track things like:
 
-- How many requests am I handling per second?
-- How many requests am I handling concurrently?
-- What is the 90th percentile of latency in my database queries?
+  - How many requests am I handling per second?
+  - How many requests am I handling concurrently?
+  - What is the 90th percentile of latency in my database queries?
 
 On a period of your choosing (for example, minutely) these metrics are summarized. You can then publish them to a graphing or monitoring system like Riemann, InfluxDB, Graphite, or Prometheus.
 
@@ -20,14 +18,17 @@ The goal of crow is to make it *dead simple* to collect and report these metrics
 - [How does it work?](#how-does-it-work)
 - [API](#api)
   - [Registry](#registry)
+  - [Snapshot](#snapshot)
 - [Metrics objects](#metrics-objects)
   - [Gauge](#gauge)
   - [Counter](#counter)
   - [Distribution](#distribution)
 - [How distributions work](#how-distributions-work)
 - [Built-in plugins](#built-in-plugins)
+  - [InfluxDB](#influxdb)
   - [Prometheus](#prometheus)
   - [Viz](#viz)
+
 
 ## Example
 
@@ -40,7 +41,7 @@ var express = require("express");
 var webService = express();
 
 // one registry to rule them all, publishing once a minute.
-var metrics = new crow.Registry({ period: 60000 });
+var metrics = new crow.MetricsRegistry({ period: 60000 });
 
 // publish metrics to /metrics, formatted for prometheus.
 webService.use("/metrics", crow.prometheusExporter(express, metrics));
@@ -61,181 +62,205 @@ webService.get("/", function (request, response) {
 });
 ```
 
+
 ## How does it work?
 
 Metrics consist of:
 
-- **counters**: numbers that increase only (never decrease), like the number of requests handled since the server started.
-- **gauges**: dials that measure a changing state, like the number of currently open connections, or the amount of memory being used.
-- **distributions**: samples that are interesting for their histogram, like timings (95th percentile of database reads, for example).
+  - **counters**: numbers that increase only (never decrease), like the number of requests handled since the server started.
+  - **gauges**: dials that measure a changing state, like the number of currently open connections, or the amount of memory being used.
+  - **distributions**: samples that are interesting for their histogram, like timings (95th percentile of database reads, for example).
 
-Metrics are collected in a `Registry` (usually you create only one). On a configurable period, these metrics are summarized and sent to observers. The observers can push the summary to a push-based service like Riemann, or post the results to a web service for a poll-based service like Prometheus.
+Metrics are collected in a `MetricsRegistry` (usually you create only one). On a configurable period, these metrics are summarized and sent to observers. The observers can push the summary to a push-based service like Graphite, or post the results to a web service for a poll-based service like Prometheus.
 
 Each metric has a name, which is a string. Crow doesn't care what's in the string, but if you're sending metrics to a service, most of them have a naming convention. In general, you should use a name that could be an identifier (starts with a letter, contains only letters, digits, and underscore). Some metrics services use dot to build folder-like namespaces. Typical metric names are:
 
-- `requests_received`
-- `mysql_select_count`
-- `users_query_msec`
+  - `requests_received`
+  - `mysql_select_count`
+  - `users_query_msec`
 
-The last one is an example of a timing. Usually timings should include the time unit as the last segment of their name, as a convention.
+The last one is an example of a timing. As a convention, timings should include the time unit as the last segment of their name.
 
 Each metric may also have a set of "tags" attached. A tag is a name/value pair, both strings, that identifies some variant of the metric. For example, a request handler may use a different tag for successful operations and exceptions. When generating string forms of metrics, the tags are appended in alphabetical order, separated by commas, surrounded by curly braces. (This is a standard form used by most of the open-source metrics services.)
 
-- `requests_handled{success=true}`
-- `requests_handled{exception=IOError}`
-- `requests_handled{exception=AccessDenied}`
+  - `requests_handled{success=true}`
+  - `requests_handled{exception=IOError}`
+  - `requests_handled{exception=AccessDenied}`
 
 Tags are used by metrics services to split out interesting details while allowing the general case (`requests_handled` above) to be summarized.
 
+
 ## API
 
-- `new Registry(options)`
+  - `new MetricsRegistry(options)`
 
-  The registry is the central coordinator for metrics collection and dispersal. It tracks metrics in a single namespace, and periodically takes a snapshot and sends it to any observers. (A typical observer might push the metrics into riemann, influxdb, or prometheus.)
+    The registry is the central coordinator for metrics collection and dispersal. It tracks metrics in a single namespace, and periodically takes a snapshot and sends it to any observers. (A typical observer might push the metrics into graphite, riemann, influxdb, or prometheus.)
 
-  Options:
+    Options:
 
-  - `period` (in milliseconds) - how often to send snapshots to observers; default is 60_000, or one minute
-  - `log` - a bunyan-compatible logger to use for debug logs; if no log is provided, nothing is logged
-  - `percentiles` (array) - percentiles to collect on distributions, as a real number between 0 and 1; default is `[ 0.5, 0.9, 0.99 ]`, or the 50th (median), 90th, and 99th percentiles
-  - `error` - number between 0 and 1 representing the rank error allowed when estimating percentiles; default is 0.01 (1%) which is usually fine
-  - `tags` - (object of string keys & values) set of tags to apply by default to every metric; often used for instance-wide tags like `instanceId` or `hostname`
-  - `separator` - (string) what to use to separate segments in metric names with `withPrefix`
+    - `period` (in milliseconds) - how often to send snapshots to observers; default is 60_000, or one minute
+    - `log` - a bunyan-compatible logger to use for debug logs; if no log is provided, nothing is logged
+    - `percentiles` (array) - percentiles to collect on distributions, as a real number between 0 and 1; default is `[ 0.5, 0.9, 0.99 ]`, or the 50th (median), 90th, and 99th percentiles
+    - `error` - number between 0 and 1 representing the rank error allowed when estimating percentiles; default is 0.01 (1%) which is usually fine
+    - `tags` - (object of string keys & string values) set of tags to apply by default to every metric; often used for instance-wide tags like `instanceId` or `hostname`
+    - `separator` - (string) what to use to separate segments in metric names with `withPrefix`
 
-  The `percentiles` and `error` options are used as defaults and may be overridden by individual distributions. For more about how the distributions are calculated, see [distributions](#distributions) below.
+    The `percentiles` and `error` options are used as defaults and may be overridden by individual distributions. For more about how the distributions are calculated, see [distributions](#distributions) below.
 
-- `prometheusExporter(express, registry)`
+  - `exportInflux(registry, request, options)`
 
-  See the [prometheus plugin](#prometheus) below.
+    See the [influxdb plugin](#influxdb) below.
 
-- `viz(express, registry, span = 60 * 60 * 1000)`
+  - `prometheusExporter(express, registry)`
 
-  See the [viz plugin](#viz) below.
+    See the [prometheus plugin](#prometheus) below.
 
-- `startVizServer(express, registry, port = 8080)`
+  - `viz(express, registry, span = 60 * 60 * 1000)`
 
-  See the [viz plugin](#viz) below.
+    See the [viz plugin](#viz) below.
+
+  - `startVizServer(express, registry, port = 8080)`
+
+    See the [viz plugin](#viz) below.
+
 
 ### Registry
 
-- `counter(name, tags = {})`
+  - `counter(name, tags = {})`
 
-  Return a new or existing counter with the given name and tags. Counter objects may be cached, or you may call `counter` to look it up each time. See [Metrics objects](#metrics-objects) below for the counter object API.
+    Return a new or existing counter with the given name and tags. Counter objects may be cached, or you may call `counter` to look it up each time. See [Metrics objects](#metrics-objects) below for the counter object API.
 
-- `setGauge(name, tags = {}, getter)`
+  - `setGauge(name, tags = {}, getter)`
 
-  Build a new gauge with the given name, tags, and "getter". The "getter" is usually a function that will be called when crow wants to know the current value. If the value changes rarely, `getter` may be a number instead, and you can call `setGauge` with a new number each time the value changes.
+    Build a new gauge with the given name, tags, and "getter". The "getter" is usually a function that will be called when crow wants to know the current value. If the value changes rarely, `getter` may be a number instead, and you can call `setGauge` with a new number each time the value changes.
 
-- `gauge(name, tags = {})`
+  - `gauge(name, tags = {})`
 
-  Return the gauge with the given name and tags. If no such gauge is found, it throws an exception. See [Metrics objects](#metrics-objects) below for the gauge object API.
+    Return the gauge with the given name and tags. If no such gauge is found, it throws an exception. See [Metrics objects](#metrics-objects) below for the gauge object API.
 
-- `distribution(name, tags = {}, percentiles = this.percentiles, error = this.error)`
+  - `distribution(name, tags = {}, percentiles = this.percentiles, error = this.error)`
 
-  Return a new or existing distribution with the given name and tags. If `percentiles` or `error` is non-null, they will override the registry defaults. See [Metrics objects](#metrics-objects) below for the distribution object API.
+    Return a new or existing distribution with the given name and tags. If `percentiles` or `error` is non-null, they will override the registry defaults. See [Metrics objects](#metrics-objects) below for the distribution object API.
 
-- `withPrefix(prefix)`
+  - `withPrefix(prefix)`
 
-  Return a registry-like object which prefixes all metric names with the given prefix plus the separator (usually "\_" but set in a `Registry` constructor option). The returned object is really a "view" of this registry. For example, the following two lines create or find the same counter:
+    Return a registry-like object which prefixes all metric names with the given prefix plus the separator (usually "\_" but set in a `Registry` constructor option). The returned object is really a "view" of this registry. For example, the following two lines create or find the same counter:
 
-  ```javascript
-  var registry = new crow.Registry({ separator: "." });
-  registry.counter("cats.meals")
-  registry.withPrefix("cats").counter("meals")
-  ```
+    ```javascript
+    var registry = new crow.Registry({ separator: "." });
+    registry.counter("cats.meals")
+    registry.withPrefix("cats").counter("meals")
+    ```
 
-- `addObserver(observer)`
+  - `addObserver(observer)`
 
-  Add an observer. The registry maintains an array of observer objects, and sends a snapshot of the current state to each observer at each interval specified by the period of the registry. For example, if the registry's period is 60000, or 60 seconds, then each observer is invoked minutely.
+    Add an observer. The registry maintains an array of observer objects, and sends a snapshot of the current state to each observer at each interval specified by the period of the registry. For example, if the registry's period is 60000, or 60 seconds, then each observer is invoked minutely, at the top of the minute.
 
-  The observers are all expected to be functions that accept two parameters:
+    The observers are all expected to be functions that accept one parameter, a snapshot (described below):
 
-  - `function observer(timestamp, snapshot)`
+      - `function observer(snapshot)`
 
-  The timestamp is the current epoch time in milliseconds. The snapshot is an object with string keys and numeric values. The keys are fully-qualified metric names with the tags expanded. An example snapshot:
+    A typical observer collects the metrics snapshot and reports it to another service, either by pull (exposing the metrics on a web port) or push (sending them immediately to another server). [Viz](#viz) is an observer that collects an hour of metrics and makes a simple web page summarizing the data.
 
-  ```javascript
-  {
-    "request_time_msec{quantile=\"0.99\"}": 32,
-    "request_time_msec_count": 9,
-    "heap_used": 14937602
-  }
-  ```
 
-  A typical observer collects the metrics snapshot and reports it to another service, either by pull (exposing the metrics on a web port) or push (sending them immediately to another server). [Viz](#viz) is an observer that collects an hour of metrics and makes a simple web page summarizing the data.
+### Snapshot
+
+Each observer receives a `Snapshot` object at a regular interval, which contains the set of metrics being collected and their current values. It's only interesting if you are publishing metrics in a custom way. If you plan to use one of the plugins to publish to InfluxDB, Prometheus, or so on, then you can skip this section.
+
+A snapshot object has these fields:
+
+  - `timestamp` - the current epoch time in milliseconds
+  - `map` - an ES6 `Map` of metric objects to their value at that timestamp
+
+The metrics objects are described below. Each has at least a name, a `Tags` object, and a type. The value may be a number (for gauges and counters) or a `Map` of string names to numbers for a distribution: one for each requested percentile, plus a count and a sum.
+
+The `Tags` object wraps a `Map` of string tag names and values, and provides methods for merging tags and generating a string of their contents. `Snapshot` objects also provide methods to help generate string keys for each metric name and tags. Check out the source for detailed documentation about how to use these objects directly.
+
+The default `flatten()` method will generate a flat `Map` of string keys to numbers, encoding tags in OpenTSDB format, and attaching distribution maps using a "p" tag:
+
+```javascript
+{
+  "bugs": 13,
+  "bugs{module=sickbay}": 8,
+  "request_time_msec{p=0.5}": 9,
+  "request_time_msec{p=0.99}": 32,
+  "request_time_msec{p=count}": 12,
+  "request_time_msec{p=sum}": 549,
+  "heap_used": 14937602
+}
+```
+
 
 ## Metrics objects
 
-All metrics objects created by a `Registry` have a field `type` which is one of the following values:
+All metrics objects created by a `Registry` have at least these fields:
 
-- `MetricType.GAUGE`
-- `MetricType.COUNTER`
-- `MetricType.DISTRIBUTION`
+  - `name` - as given when the metric was created
+  - `type` - the lowercase version of the class name (`gauge`, `counter`, or `distribution`)
+  - `tags` - a `Tags` object wrapping a `Map` of string tag names and string values
+  - `value`: - the current value, either as a number, or (for distributions) a `Map` of string keys to numbers
 
 Other methods vary based on the type:
 
 ### Gauge
 
-- `get()`
+  - `set(getter)`
 
-  Return the current value of the gauge by calling its getter.
+    Replace the gauge's getter function.
 
 ### Counter
 
-- `get()`
+  - `increment(count = 1, tags = {})`
 
-  Return the current value of the counter.
+    Increment the counter. If `tags` is given, it's a shortcut for calling `withTags()` first.
 
-- `increment(count = 1, tags = {})`
+  - `withTags(tags)`
 
-  Increment the counter. If `tags` is given, it's a shortcut for calling `withTags()` first.
-
-- `withTags(tags)`
-
-  Return a new or existing counter with the same name as this one, but different tags. This is useful if you have a cached counter object for a name, but sometimes want to increment a counter with a different tag (like an exception name).
+    Return a new or existing counter with the same name as this one, but different tags. This is useful if you have a cached counter object for a name, but sometimes want to increment a counter with a different tag (like an exception name).
 
 ### Distribution
 
-- `get()`
+  - `value`
 
-  Compute percentiles based on the samples collected, and reset the collection. This is a destructive operation, so normally it's only used by `Registry` to generate the periodic snapshots.
+    Compute percentiles based on the samples collected, and reset the collection. This is a destructive operation, so normally it's only used by `Registry` to generate the periodic snapshots.
 
-  The returned object will contain a key for each percentile requested, and two additional metrics:
-  - a `(name)_count` metric to report the number of samples in this time period
-  - a `(name)_sum` metric to report the sum of all samples in this time period
+    The returned `Map` will contain a key for each percentile requested, and two additional metrics:
+      - a `count` metric to report the number of samples in this time period
+      - a `sum` metric to report the sum of all samples in this time period
 
-  Percentiles are represented by adding a "quantile" tag.
+    Percentiles are represented by their numeric value ("0.5").
 
-  For example, when computing the 50th and 95th percentiles of a metric called `request_time_msec`, `get()` will return an object like this:
+    For example, when computing the 50th and 95th percentiles of a metric called `request_time_msec`, `value` will return a `Map` like this:
 
-  ```javascript
-  {
-    "request_time_msec{quantile=\"0.5\"}": 23,
-    "request_time_msec{quantile=\"0.95\"}": 81,
-    "request_time_msec_count": 104,
-    "request_time_msec_sum": 4188
-  }
-  ```
+    ```javascript
+    {
+      "0.5": 23,
+      "0.95": 81,
+      "count": 104,
+      "sum": 4188
+    }
+    ```
 
-- `add(data)`
+  - `add(data)`
 
-  Add a sample to the distribution. If `data` is an array, all the data points in the array are added.
+    Add a sample to the distribution. If `data` is an array, all the data points in the array are added.
 
-- `time(f)`
+  - `time(f)`
 
-  Call `f` as a function, recording the time it takes to complete, in milliseconds. If `f` returns a promise (an object with a field named `then` which is a function), it will record the time it takes the promise to complete. Returns whatever `f` returns, so you can call it inline like:
+    Call `f` as a function, recording the time it takes to complete, in milliseconds. If `f` returns a promise (an object with a field named `then` which is a function), it will record the time it takes the promise to complete. Returns whatever `f` returns, so you can call it inline like:
 
-  ```javascript
-  var dbTimer = registry.distribution("db_select_msec");
+    ```javascript
+    var dbTimer = registry.distribution("db_select_msec");
 
-  dbTimer.time(db.select("...")).then(function (rows) {
-    // ...
-  });
-  ```
+    dbTimer.time(db.select("...")).then(function (rows) {
+      // ...
+    });
+    ```
 
-- `withTags(tags)`
+  - `withTags(tags)`
 
-  Return a new or existing distribution with the same name as this one, but different tags.
+    Return a new or existing distribution with the same name as this one, but different tags.
+
 
 ## How distributions work
 
@@ -248,6 +273,10 @@ For most uses, this is overkill. If you specify an allowable rank error of 1%, a
 The upshot is that for small servers, it's equivalent to keeping all the samples and computing the percentiles exactly on each interval. For large servers, it processes batches of samples at a time (varying based on the desired error; 50 at a time for 1%) and computes a close estimate, using a small fraction of the samples.
 
 ## Built-in plugins
+
+### InfluxDB
+
+FIXME
 
 ### Prometheus
 
