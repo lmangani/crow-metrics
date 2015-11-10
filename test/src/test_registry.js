@@ -1,15 +1,15 @@
 "use strict";
 
-import { Registry } from "../../lib";
+import { MetricsRegistry } from "../../lib";
 import Promise from "bluebird";
 
 import "should";
 import "source-map-support/register";
 
 
-describe("Registry", () => {
+describe("MetricsRegistry", () => {
   it("remembers counters", () => {
-    const r = new Registry();
+    const r = new MetricsRegistry();
     const c = r.counter("buckets");
     c.value.should.eql(0);
     c.increment(5);
@@ -22,7 +22,7 @@ describe("Registry", () => {
 
   it("remembers gauges", () => {
     let state = 0;
-    const r = new Registry();
+    const r = new MetricsRegistry();
     r.setGauge("speed", 100);
     r.setGauge("computed", { animal: "cat" }, () => {
       state += 1;
@@ -34,7 +34,7 @@ describe("Registry", () => {
   });
 
   it("replaces gauges", () => {
-    const r = new Registry();
+    const r = new MetricsRegistry();
     r.setGauge("speed", 100);
     r.gauge("speed").value.should.eql(100);
     r.setGauge("speed", 150);
@@ -44,7 +44,7 @@ describe("Registry", () => {
   });
 
   it("remembers distributions", () => {
-    const r = new Registry();
+    const r = new MetricsRegistry();
     const d = r.distribution("stars", {}, [ 0.5, 0.9 ]);
     d.add([ 10, 20, 30 ]);
     Array.from(d.value).should.eql([
@@ -66,7 +66,7 @@ describe("Registry", () => {
   });
 
   it("records times in distributions", done => {
-    const r = new Registry();
+    const r = new MetricsRegistry();
     const d = r.distribution("stars", {}, [ 0.5, 0.9 ]);
     d.time(() => "hi").should.eql("hi");
     d.time(() => Promise.delay(50).then(() => 99)).then(rv => {
@@ -80,7 +80,7 @@ describe("Registry", () => {
   });
 
   it("tracks tags", () => {
-    const r = new Registry();
+    const r = new MetricsRegistry();
     const c = r.counter("buckets", { city: "San Jose" });
     c.increment(3);
     c.withTags({ city: null, contents: "fire" }).increment(10);
@@ -88,7 +88,7 @@ describe("Registry", () => {
   });
 
   it("honors default tags", () => {
-    const r = new Registry({ tags: { instance: "i-ffff" } });
+    const r = new MetricsRegistry({ tags: { instance: "i-ffff" } });
     r.counter("a", { city: "San Jose" });
     r.counter("b", { instance: "i-0000" });
     r.setGauge("c", { city: "Berryessa" }, 100);
@@ -111,7 +111,7 @@ describe("Registry", () => {
   });
 
   it("makes a snapshot", () => {
-    const r = new Registry();
+    const r = new MetricsRegistry();
     r.counter("buckets", { city: "San Jose" }).increment(10);
     r.counter("cats").increment(900);
     r.counter("buckets", { contents: "fire" }).increment(3);
@@ -132,7 +132,7 @@ describe("Registry", () => {
 
   it("publishes to observers", done => {
     const captured = [];
-    const r = new Registry({ period: 10 });
+    const r = new MetricsRegistry({ period: 10 });
     r.addObserver(snapshot => captured.push(snapshot));
     r.counter("buckets").increment(5);
     setTimeout(() => {
@@ -148,14 +148,14 @@ describe("Registry", () => {
   });
 
   it("refuses to let two metrics have the same name", () => {
-    const r = new Registry();
+    const r = new MetricsRegistry();
     r.setGauge("buckets", 10);
     (() => r.counter("buckets")).should.throw("buckets is already a gauge");
     (() => r.distribution("buckets")).should.throw("buckets is already a gauge");
   });
 
   it("can sub-divide by prefix", () => {
-    const r = new Registry();
+    const r = new MetricsRegistry();
     const r2 = r.withPrefix("myserver");
     r2.setGauge("gauge", 10);
     r2.counter("counter").increment(3);
@@ -172,7 +172,7 @@ describe("Registry", () => {
       "myserver_moar_wut"
     ]);
 
-    const rr = new Registry({ separator: "." });
+    const rr = new MetricsRegistry({ separator: "." });
     rr.withPrefix("prod").withPrefix("racetrack").counter("requests").increment();
     Array.from(rr.snapshot().flatten().keys()).sort().should.eql([
       "prod.racetrack.requests"

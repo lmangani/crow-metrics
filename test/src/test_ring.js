@@ -1,6 +1,6 @@
 "use strict";
 
-import { Registry, RingBufferObserver } from "../../lib";
+import { MetricsRegistry, RingBufferObserver } from "../../lib";
 
 import "should";
 import "source-map-support/register";
@@ -8,7 +8,7 @@ import "source-map-support/register";
 
 describe("RingBufferObserver", () => {
   it("tracks gauges", () => {
-    const r = new Registry();
+    const r = new MetricsRegistry();
     const rb = new RingBufferObserver(r);
     r.setGauge("speed", 45);
     r._publish();
@@ -21,7 +21,7 @@ describe("RingBufferObserver", () => {
   });
 
   it("tracks counters", () => {
-    const r = new Registry();
+    const r = new MetricsRegistry();
     const rb = new RingBufferObserver(r);
     r.counter("bruises").increment();
     r._publish();
@@ -39,7 +39,7 @@ describe("RingBufferObserver", () => {
   });
 
   it("tracks distributions", () => {
-    const r = new Registry();
+    const r = new MetricsRegistry();
     const rb = new RingBufferObserver(r);
     const d = r.distribution("timings", {}, [ 0.5, 0.9 ]);
     d.add(2);
@@ -59,7 +59,7 @@ describe("RingBufferObserver", () => {
   });
 
   it("reports missing metrics", () => {
-    const r = new Registry();
+    const r = new MetricsRegistry();
     const rb = new RingBufferObserver(r);
     r.counter("cats").increment(3);
     r._publish();

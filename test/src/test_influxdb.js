@@ -1,6 +1,6 @@
 "use strict";
 
-import { exportInflux, Registry } from "../../lib";
+import { exportInflux, MetricsRegistry } from "../../lib";
 
 import "should";
 import "source-map-support/register";
@@ -19,7 +19,7 @@ describe("exportInflux", () => {
 
 
   it("reports empty metrics", () => {
-    const r = new Registry();
+    const r = new MetricsRegistry();
     exportInflux(r, request, { hostname: "influxdb.dev.example.com:8086", database: "wut", timeout: 500 });
     r._publish();
     saved.length.should.eql(1);
@@ -33,7 +33,7 @@ describe("exportInflux", () => {
   });
 
   it("reports actual metrics", () => {
-    const r = new Registry();
+    const r = new MetricsRegistry();
     exportInflux(r, request);
     r.counter("tickets").increment(5);
     r.setGauge("speed", { vessel: "sailboat" }, 100);

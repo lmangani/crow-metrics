@@ -1,6 +1,6 @@
 "use strict";
 
-import { Registry, deltaObserver } from "../../lib";
+import { MetricsRegistry, deltaObserver } from "../../lib";
 
 import "should";
 import "source-map-support/register";
@@ -9,7 +9,7 @@ import "source-map-support/register";
 describe("DeltaObserver", () => {
   it("passes through gauges and distributions unharmed", () => {
     const snapshots = [];
-    const r = new Registry();
+    const r = new MetricsRegistry();
     r.addObserver(deltaObserver(s => snapshots.push(s)));
 
     r.setGauge("speed", 45);
@@ -26,7 +26,7 @@ describe("DeltaObserver", () => {
 
   it("computes deltas for counters", () => {
     const snapshots = [];
-    const r = new Registry();
+    const r = new MetricsRegistry();
     r.addObserver(deltaObserver(s => snapshots.push(s)));
 
     r.counter("tickets").increment(5);
@@ -43,7 +43,7 @@ describe("DeltaObserver", () => {
 
   it("remembers old values across slow times", () => {
     const snapshots = [];
-    const r = new Registry();
+    const r = new MetricsRegistry();
     r.addObserver(deltaObserver(s => snapshots.push(s)));
 
     r._publish();
