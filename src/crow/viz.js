@@ -7,15 +7,18 @@ import { RingBufferObserver } from "./ring";
 const staticPath = path.resolve(require.resolve(".."), "../../static");
 
 /*
- * create a sub-path on your existing web server for displaying per-server
+ * Create a sub-path on your existing web server for displaying per-server
  * metrics:
  *
+ *     import { MetricsRegistry, viz } from "crow-metrics";
+ *     import express from "express";
+ *
  *     const app = express();
- *     const metrics = new crow.Registry();
- *     app.use("/viz", crow.viz(express, metrics));
+ *     const metrics = new MetricsRegistry();
+ *     app.use("/viz", viz(express, metrics));
  *     app.listen(8080);
  *
- * you can place it at any path you want.
+ * You can place it at any path you want.
  */
 export function viz(express, registry, span) {
   const router = express.Router();
@@ -42,11 +45,14 @@ export function viz(express, registry, span) {
 }
 
 /*
- * if you don't have any other use for a web server, you can use this to
+ * If you don't have any other use for a web server, you can use this to
  * do the whole creation:
  *
- *     var metrics = new crow.Registry();
- *     crow.startVizServer(express, metrics);
+ *     import { MetricsRegistry, startVizServer } from "crow-metrics";
+ *     import express from "express";
+ *
+ *     var metrics = new MetricsRegistry();
+ *     startVizServer(express, metrics);
  */
 export function startVizServer(express, registry, port = 8080) {
   const app = express();

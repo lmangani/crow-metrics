@@ -11,10 +11,13 @@ const DEFAULT_ERROR = 0.01;
 
 
 /*
- * The registry is the central coordinator for metrics collection and
+ * A MetricsRegistry is the central coordinator for metrics collection and
  * dispersal. It tracks metrics in a single namespace, and periodically
  * takes a snapshot and sends it to any observers. (A typical observer might
  * push the metrics into riemann, influxdb, or prometheus.)
+ *
+ * Normally, you'd only create one of these, but it's perfectly valid to
+ * create several and use them independently, if you want.
  *
  * Each metric object contains:
  *   - name
@@ -29,7 +32,7 @@ const DEFAULT_ERROR = 0.01;
  *   - tags: (object) default tags to apply to each metric
  *   - separator: (string) what to use in `withPrefix`; default is "_"
  */
-export default class Registry {
+export default class MetricsRegistry {
   constructor(options = {}) {
     // metrics are stored by their "fully-qualified" name, using stringified tags.
     this.metrics = new Map();

@@ -42,10 +42,10 @@ export function influxObserver(registry, observer) {
  * Given a 'request' (or request-like) module, create an observer attached
  * to a registry that will `POST` snapshots in influxdb format.
  *
- *     import { exportInflux, Registry } from "crow-metrics";
+ *     import { exportInflux, MetricsRegistry } from "crow-metrics";
  *     import request from "request";
  *
- *     const registry = new Registry();
+ *     const registry = new MetricsRegistry();
  *     exportInflux(registry, request, "influxdb.prod.example.com", "prod");
  *
  * Options:

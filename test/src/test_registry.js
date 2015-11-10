@@ -141,10 +141,10 @@ describe("Registry", () => {
         captured.length.should.eql(2);
         Array.from(captured[0].flatten()).should.eql([ [ "buckets", { value: 5, type: "counter" } ] ]);
         Array.from(captured[1].flatten()).should.eql([ [ "buckets", { value: 8, type: "counter" } ] ]);
-        (captured[1].timestamp - captured[0].timestamp).should.be.greaterThan(10);
+        (captured[1].timestamp - captured[0].timestamp).should.be.greaterThan(8);
         done();
-      }, 15);
-    }, 15);
+      }, 13);
+    }, 13);
   });
 
   it("refuses to let two metrics have the same name", () => {

@@ -67,10 +67,10 @@ export class PrometheusObserver {
  * attached to a registry. the returned object is meant to be 'use'd by
  * express, like this:
  *
- *     import { prometheusExporter, Registry } from "crow-metrics";
+ *     import { prometheusExporter, MetricsRegistry } from "crow-metrics";
  *     import express from "express";
  *
- *     const registry = new Registry();
+ *     const registry = new MetricsRegistry();
  *     const app = express();
  *     app.use("/metrics", prometheusExporter(express, registry));
  *     app.listen(9090);
