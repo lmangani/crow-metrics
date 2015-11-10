@@ -1,7 +1,7 @@
 "use strict";
 
 import path from "path";
-import { RingBufferObserver } from "./ring";
+import RingBufferObserver from "./ring";
 
 // find our static folder -> ./lib/crow/viz/viz.js -> ./static
 const staticPath = path.resolve(require.resolve(".."), "../../static");
