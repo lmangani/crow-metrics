@@ -14,13 +14,13 @@
   },
   "license": "Apache-2.0",
   "scripts": {
-    "build": "eslint src test/src && npm run build-source && npm run build-test",
+    "build": "eslint src test/src && npm run build-source",
     "build-source": "babel --source-maps --out-dir lib src",
     "build-test": "babel --source-maps --out-dir test/lib test/src",
     "clean": "rm -rf lib",
     "distclean": "npm run clean && rm -rf node_modules npm-debug.log",
     "prepublish": "npm run build",
-    "test": "mocha -R spec --colors test/lib --timeout 30000"
+    "test": "npm run build-test && mocha -R spec --colors test/lib --timeout 30000"
   },
   "dependencies": {
     "bluebird": "latest"
