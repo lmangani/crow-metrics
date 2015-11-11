@@ -30,12 +30,11 @@ export default class Snapshot {
 
     const map = new Map();
     for (const [ metric, value ] of this.map) {
-      const type = metric.constructor.name.toLowerCase();
       if (typeof value == "number") {
-        map.set(formatter(metric.name, metric.tags), { value, type });
+        map.set(formatter(metric.name, metric.tags), { value, type: metric.type });
       } else {
         for (const [ k, v ] of value) {
-          map.set(formatter(metric.name, metric.tags, k), { value: v, type });
+          map.set(formatter(metric.name, metric.tags, k), { value: v, type: metric.type });
         }
       }
     }

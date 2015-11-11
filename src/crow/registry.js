@@ -21,6 +21,7 @@ const DEFAULT_ERROR = 0.01;
  *
  * Each metric object contains:
  *   - name
+ *   - type (`this.constructor.name.toLowerCase()`)
  *   - tags
  *   - value: Number or Map(String -> Number)
  *
@@ -184,11 +185,12 @@ export default class MetricsRegistry {
     let metric = this.metrics.get(fullname);
     if (metric !== undefined) {
       if (metric.constructor != type) {
-        throw new Error(`${fullname} is already a ${metric.constructor.name.toLowerCase()}`);
+        throw new Error(`${fullname} is already a ${metric.type}`);
       }
       return metric;
     }
     metric = maker(name, tags);
+    metric.type = metric.constructor.name.toLowerCase();
     this.metrics.set(fullname, metric);
     return metric;
   }

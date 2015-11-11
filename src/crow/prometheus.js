@@ -31,8 +31,7 @@ export class PrometheusObserver {
       // build type fields.
       const seen = new Set();
       for (const [ metric ] of this.lastSnapshot.map) {
-        let typename = metric.constructor.name.toLowerCase();
-        if (typename == "distribution") typename = "summary";
+        const typename = metric.type == "distribution" ? "summary" : metric.type;
         if (!seen.has(metric.name)) lines.push(`# TYPE ${metric.name} ${typename}`);
         seen.add(metric.name);
       }
