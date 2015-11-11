@@ -17,7 +17,7 @@ The goal of crow is to make it *dead simple* to collect and report these metrics
 - [Example](#example)
 - [How does it work?](#how-does-it-work)
 - [API](#api)
-  - [Registry](#registry)
+  - [MetricsRegistry](#metricsregistry)
   - [Snapshot](#snapshot)
 - [Metrics objects](#metrics-objects)
   - [Gauge](#gauge)
@@ -124,7 +124,7 @@ Tags are used by metrics services to split out interesting details while allowin
     See the [viz plugin](#viz) below.
 
 
-### Registry
+### MetricsRegistry
 
   - `counter(name, tags = {})`
 
@@ -144,10 +144,10 @@ Tags are used by metrics services to split out interesting details while allowin
 
   - `withPrefix(prefix)`
 
-    Return a registry-like object which prefixes all metric names with the given prefix plus the separator (usually "\_" but set in a `Registry` constructor option). The returned object is really a "view" of this registry. For example, the following two lines create or find the same counter:
+    Return a registry-like object which prefixes all metric names with the given prefix plus the separator (usually "\_" but set in a `MetricsRegistry` constructor option). The returned object is really a "view" of this registry. For example, the following two lines create or find the same counter:
 
     ```javascript
-    var registry = new crow.Registry({ separator: "." });
+    var registry = new crow.MetricsRegistry({ separator: "." });
     registry.counter("cats.meals")
     registry.withPrefix("cats").counter("meals")
     ```
@@ -193,7 +193,7 @@ The default `flatten()` method will generate a flat `Map` of string keys to numb
 
 ## Metrics objects
 
-All metrics objects created by a `Registry` have at least these fields:
+All metrics objects created by a `MetricsRegistry` have at least these fields:
 
   - `name` - as given when the metric was created
   - `type` - the lowercase version of the class name (`gauge`, `counter`, or `distribution`)
@@ -222,7 +222,7 @@ Other methods vary based on the type:
 
   - `value`
 
-    Compute percentiles based on the samples collected, and reset the collection. This is a destructive operation, so normally it's only used by `Registry` to generate the periodic snapshots.
+    Compute percentiles based on the samples collected, and reset the collection. This is a destructive operation, so normally it's only used by `MetricsRegistry` to generate the periodic snapshots.
 
     The returned `Map` will contain a key for each percentile requested, and two additional metrics:
       - a `count` metric to report the number of samples in this time period
@@ -272,11 +272,33 @@ For most uses, this is overkill. If you specify an allowable rank error of 1%, a
 
 The upshot is that for small servers, it's equivalent to keeping all the samples and computing the percentiles exactly on each interval. For large servers, it processes batches of samples at a time (varying based on the desired error; 50 at a time for 1%) and computes a close estimate, using a small fraction of the samples.
 
+
 ## Built-in plugins
 
 ### InfluxDB
 
-FIXME
+[InfluxDB](https://influxdb.com/), like Graphite, expects to receive a `POST` containing a summary of metrics from each server at a regular interval.
+
+The influx observer receives each snapshot as it's computed and broadcast by crow, formats it into a document in InfluxDB format, and posts it to the configured host. You must provide the `request` module, or a module with a similar interface.
+
+```javascript
+var crow = require("crow-metrics");
+var request = require("request");
+
+var registry = new crow.MetricsRegistry();
+crow.exportInflux(registry, request, { hostname: "my.influx.server:8086", database: "mydb" });
+```
+
+  - `exportInflux(registry, request, options = {})`
+
+The available options are:
+
+  - `hostname` - influxdb host (default: "influxdb.local:8086")
+  - `database` - influxdb database name (default: "test")
+  - `url` - use a custom url, instead of `http://(hostname)/write?db=(database)` (overrides `hostname` and `database` options)
+  - `timeout` - how long to wait before giving up (msec, default 5000)
+  - `log` - bunyan-style log for reporting errors
+
 
 ### Prometheus
 
@@ -288,15 +310,16 @@ The prometheus observer attaches to any existing [express](http://expressjs.com/
 var crow = require("crow-metrics");
 var express = require("express");
 
-var registry = new crow.Registry();
+var registry = new crow.MetricsRegistry();
 var app = express();
 app.use("/metrics", crow.prometheusExporter(express, registry));
 app.listen(9090);
 ```
 
-The above code creates an HTTP server on port 9090, and provides a metrics summary to prometheus on the `/metrics` path. The summary is updated periodically as configured by the `Registry`.
+The above code creates an HTTP server on port 9090, and provides a metrics summary to prometheus on the `/metrics` path. The summary is updated periodically as configured by the `MetricsRegistry`.
 
 Counters and gauges are reported as-is, and distribution quantiles are reported as "summary" quantiles, in the format prometheus expects.
+
 
 ### Viz
 
@@ -312,7 +335,7 @@ If you want a devoted port for this service:
 var crow = require("crow-metrics");
 var express = require("express");
 
-var metrics = new crow.Registry();
+var metrics = new crow.MetricsRegistry();
 crow.startVizServer(express, metrics, 8080);
 ```
 
@@ -325,9 +348,11 @@ var app = express();
 app.use("/admin/viz", crow.viz(express, registry));
 ```
 
+
 ## License
 
 Apache 2 (open-source) license, included in `LICENSE.txt`.
+
 
 ## Authors
 
