@@ -75,4 +75,26 @@ describe("RingBufferObserver", () => {
     rb.getLatest().flatten().get("cats").value.should.eql(9);
     rb.getLatest().flatten().get("dogs").value.should.eql(8);
   });
+
+  it("rotates correctly", () => {
+    const r = new MetricsRegistry();
+    const rb = new RingBufferObserver(r, r.period * 5);
+    r.counter("bugs").increment(1);
+    r._publish();
+    r.counter("bugs").increment(2);
+    r._publish();
+    r.counter("bugs").increment(3);
+    r._publish();
+    rb.toJson()["bugs"].should.eql([ null, 2, 3 ]);
+    r.counter("bugs").increment(4);
+    r._publish();
+    r.counter("bugs").increment(5);
+    r._publish();
+    rb.toJson()["bugs"].should.eql([ null, 2, 3, 4, 5 ]);
+    r.counter("bugs").increment(6);
+    r._publish();
+    r.counter("bugs").increment(7);
+    r._publish();
+    rb.toJson()["bugs"].should.eql([ null, 4, 5, 6, 7 ]);
+  });
 });

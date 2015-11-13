@@ -24,7 +24,7 @@ export default class RingBufferObserver {
   get() {
     const rv = [];
     for (let i = 0; i < this.size; i++) {
-      const record = this.buffer[(this.index + i + 1) % this.size];
+      const record = this.buffer[(this.index + i) % this.size];
       if (record) rv.push(record);
     }
     return rv;
