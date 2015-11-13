@@ -70,11 +70,12 @@ export default class MetricsRegistry {
     const nextTime = Math.round((this.lastPublish + this.period) / this.periodRounding) * this.periodRounding;
     let duration = nextTime - Date.now();
     while (duration < 0) duration += this.period;
-    setTimeout(() => this._publish(), duration);
+    setTimeout(() => this._publish(nextTime), duration);
   }
 
-  _publish() {
-    const snapshot = this.snapshot();
+  // timestamp is optional.
+  _publish(timestamp) {
+    const snapshot = this.snapshot(timestamp);
     this.lastPublish = snapshot.timestamp;
     if (this.log) {
       this.log.trace(`Publishing ${this.metrics.size} metrics to ${this.observers.length} observers.`);
@@ -109,8 +110,8 @@ export default class MetricsRegistry {
    * Return a snapshot of the current value of each metric.
    * Distributions will be reset.
    */
-  snapshot() {
-    const timestamp = Date.now();
+  snapshot(timestamp) {
+    if (!timestamp) timestamp = Date.now();
     const map = new Map();
     for (const metric of this.metrics.values()) {
       map.set(metric, metric.value);
