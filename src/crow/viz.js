@@ -32,16 +32,23 @@ export function viz(express, registry, span) {
 
   router.get("/debug.json", (request, response) => {
     response.type("json");
-    response.send(observer.get());
+    response.send(mapToObject(observer.get()));
   });
 
   router.get("/current.json", (request, response) => {
-    const latest = observer.getLatest().flatten();
+    const latest = observer.getLatest();
     response.type("json");
-    response.send(JSON.stringify(latest));
+    response.send(latest ? mapToObject(latest.flatten()) : {});
   });
 
   return router;
+}
+
+function mapToObject(map) {
+  const rv = {};
+  if (!map) return rv;
+  for (const [ key, value ] of map) rv[key] = value.value;
+  return rv;
 }
 
 /*
