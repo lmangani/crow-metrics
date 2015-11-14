@@ -30,6 +30,7 @@ export default class Snapshot {
 
     const map = new Map();
     for (const [ metric, value ] of this.map) {
+      if (value == null || value === undefined) continue;
       if (typeof value == "number") {
         map.set(formatter(metric.name, metric.tags), { value, type: metric.type });
       } else {
