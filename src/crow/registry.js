@@ -116,7 +116,7 @@ export default class MetricsRegistry {
     for (const metric of this.metrics.values()) {
       map.set(metric, metric.value);
     }
-    return new Snapshot(timestamp, map);
+    return new Snapshot(this, timestamp, map);
   }
 
   /*

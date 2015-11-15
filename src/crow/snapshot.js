@@ -6,7 +6,8 @@
  * values, where the value may be a `Number` or `Map(String -> Number)`.
  */
 export default class Snapshot {
-  constructor(timestamp, map) {
+  constructor(registry, timestamp, map) {
+    this.registry = registry;
     this.timestamp = timestamp;
     this.map = map;
   }
