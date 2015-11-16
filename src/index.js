@@ -2,7 +2,7 @@
 
 import BiasedQuantileDistribution from "./crow/bqdist";
 import DeltaObserver from "./crow/delta";
-import { exportInflux, influxObserver } from "./crow/influxdb";
+import { exportInflux, InfluxObserver } from "./crow/influxdb";
 import { prometheusExporter, PrometheusObserver } from "./crow/prometheus";
 import MetricsRegistry from "./crow/registry";
 import RingBufferObserver from "./crow/ring";
@@ -12,7 +12,7 @@ export {
   BiasedQuantileDistribution,
   DeltaObserver,
   exportInflux,
-  influxObserver,
+  InfluxObserver,
   MetricsRegistry,
   prometheusExporter,
   PrometheusObserver,
