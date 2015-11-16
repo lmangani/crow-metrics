@@ -5,23 +5,28 @@ const DEFAULT_SPAN = 60 * 60 * 1000;
 
 // store metrics in a ring buffer for some amount of time (by default, one hour)
 export default class RingBufferObserver {
-  constructor(registry, span = DEFAULT_SPAN) {
-    this.span = span;
-    if (registry != null) this.register(registry);
+  constructor(options = {}) {
+    this.span = options.span || DEFAULT_SPAN;
+    this.size = 0;
+    this.buffer = null;
   }
 
-  register(registry) {
-    this.size = Math.round(this.span / registry.period);
-    this.buffer = new Array(this.size);
-    this.index = 0;
+  get observer() {
+    return snapshot => {
+      // initialize if necessary.
+      if (this.buffer == null) {
+        this.size = Math.round(this.span / snapshot.registry.period);
+        this.buffer = new Array(this.size);
+        this.index = 0;
+      }
 
-    registry.addObserver(snapshot => {
       this.buffer[this.index] = snapshot;
       this.index = (this.index + 1) % this.size;
-    });
+    };
   }
 
   get() {
+    if (this.buffer == null) return [];
     const rv = [];
     for (let i = 0; i < this.size; i++) {
       const record = this.buffer[(this.index + i) % this.size];
@@ -31,6 +36,7 @@ export default class RingBufferObserver {
   }
 
   getLatest() {
+    if (this.buffer == null) return {};
     return this.buffer[(this.index + this.size - 1) % this.size];
   }
 

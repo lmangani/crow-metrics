@@ -24,19 +24,21 @@ export function viz(express, registry, span) {
   const router = express.Router();
   router.use("/", express.static(staticPath));
 
-  const observer = new RingBufferObserver(registry, span);
+  const ringBuffer = new RingBufferObserver({ span });
+  registry.addObserver(ringBuffer.observer);
+
   router.get("/history.json", (request, response) => {
     response.type("json");
-    response.send(observer.toJson());
+    response.send(ringBuffer.toJson());
   });
 
   router.get("/debug.json", (request, response) => {
     response.type("json");
-    response.send(mapToObject(observer.get()));
+    response.send(mapToObject(ringBuffer.get()));
   });
 
   router.get("/current.json", (request, response) => {
-    const latest = observer.getLatest();
+    const latest = ringBuffer.getLatest();
     response.type("json");
     response.send(latest ? mapToObject(latest.flatten()) : {});
   });
