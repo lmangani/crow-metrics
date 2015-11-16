@@ -9,7 +9,6 @@ This manual is meant to cover every aspect of a fairly tiny library. The section
   - [Gauge](#gauge)
   - [Counter](#counter)
   - [Distribution](#distribution)
-- [How distributions work](#how-distributions-work)
 - [Observers](#observers)
 - [Built-in plugins](#built-in-plugins)
   - [InfluxDB](#influxdb)
@@ -19,7 +18,7 @@ This manual is meant to cover every aspect of a fairly tiny library. The section
 
 ## API
 
-The top-level API consists of a [MetricsRegistry] class for recording metrics, and some classes and functions for reporting those metrics to other services at a regular interval.
+The top-level API consists of a [MetricsRegistry](#metricsregistry) class for recording metrics, and some classes and functions for reporting those metrics to other services at a regular interval.
 
 
 ### MetricsRegistry
@@ -87,6 +86,178 @@ Methods:
     Some built-in observers are described in [Observers](#observers).
 
 
+### Snapshot
+
+Each observer receives a `Snapshot` object at a regular interval, which contains the set of metrics being collected and their current values. It's only interesting if you are publishing metrics in a custom way. If you plan to use one of the plugins to publish to InfluxDB, Prometheus, or so on, then you can skip this section.
+
+A snapshot object has these fields:
+
+  - `registry` - a reference back to the [MetricsRegistry](#metricsregistry) that created it
+  - `timestamp` - the current epoch time in milliseconds
+  - `map` - an ES6 `Map` of metric objects to their value at that timestamp
+
+The metrics objects are described below. Each has at least a name, a `Tags` object, and a type. The value may be a number (for gauges and counters) or a `Map` of string names to numbers for a distribution: one for each requested percentile, plus a count and a sum.
+
+The `Tags` object wraps a `Map` of string tag names and values, and provides methods for merging tags and generating a string of their contents. `Snapshot` objects also provide methods to help generate string keys for each metric name and tags. Check out the source for detailed documentation about how to use these objects directly.
+
+The default `flatten()` method will generate a flat `Map` of string keys to numbers, encoding tags in OpenTSDB format, and attaching distribution maps using a "p" tag:
+
+```javascript
+{
+  "bugs": 13,
+  "bugs{module=sickbay}": 8,
+  "request_time_msec{p=0.5}": 9,
+  "request_time_msec{p=0.99}": 32,
+  "request_time_msec{p=count}": 12,
+  "request_time_msec{p=sum}": 549,
+  "heap_used": 14937602
+}
+```
+
+
+## Metrics objects
+
+All metrics objects created by a `MetricsRegistry` have at least these fields:
+
+  - `name` - as given when the metric was created
+  - `type` - the lowercase version of the class name (`gauge`, `counter`, or `distribution`)
+  - `tags` - a `Tags` object wrapping a `Map` of string tag names and string values
+  - `value` - the current value, either as a number, or (for distributions) a `Map` of string keys to numbers
+
+Other methods vary based on the type:
+
+### Gauge
+
+  - `set(getter)`
+
+    Replace the gauge's getter function.
+
+### Counter
+
+  - `increment(count = 1, tags = {})`
+
+    Increment the counter. If `tags` is given, it's a shortcut for calling `withTags()` first.
+
+  - `withTags(tags)`
+
+    Return a new or existing counter with the same name as this one, but different tags. This is useful if you have a cached counter object for a name, but sometimes want to increment a counter with a different tag (like an exception name).
+
+### Distribution
+
+Distributions are collected and sampled using a method described in ["Effective Computation of Biased Quantiles over Data Streams"](http://www.cs.rutgers.edu/~muthu/bquant.pdf). It attempts to keep only the samples closest to the desired percentiles, so for example, if you only want the median, it keeps most of the samples that fall in the middle of the range, but discards samples on either end. To do this, the algorithm needs to know the desired percentiles, and the allowable error.
+
+For most uses, this is overkill. If you specify an allowable rank error of 1%, and have fewer than 100 samples each minute, it's unlikely to discard _any_ of the samples, and will compute the percentiles directly. But if you have thousands of samples, it will discard most of them as it narrows in on the likely range of each percentile.
+
+The upshot is that for small servers, it's equivalent to keeping all the samples and computing the percentiles exactly on each interval. For large servers, it processes batches of samples at a time (varying based on the desired error; 50 at a time for 1%) and computes a close estimate, using a small fraction of the samples.
+
+  - `value`
+
+    Compute percentiles based on the samples collected, and reset the collection. This is a destructive operation, so normally it's only used by `MetricsRegistry` to generate the periodic snapshots.
+
+    The returned `Map` will contain a key for each percentile requested, and two additional metrics:
+      - a `count` metric to report the number of samples in this time period
+      - a `sum` metric to report the sum of all samples in this time period
+
+    Percentiles are represented by their numeric value ("0.5").
+
+    For example, when computing the 50th and 95th percentiles of a metric called `request_time_msec`, `value` will return a `Map` like this:
+
+    ```javascript
+    {
+      "0.5": 23,
+      "0.95": 81,
+      "count": 104,
+      "sum": 4188
+    }
+    ```
+
+  - `add(data)`
+
+    Add a sample to the distribution. If `data` is an array, all the data points in the array are added.
+
+  - `time(f)`
+
+    Call `f` as a function, recording the time it takes to complete, in milliseconds. If `f` returns a promise (an object with a field named `then` which is a function), it will record the time it takes the promise to complete. Returns whatever `f` returns, so you can call it inline like:
+
+    ```javascript
+    var dbTimer = registry.distribution("db_select_msec");
+
+    dbTimer.time(db.select("...")).then(function (rows) {
+      // ...
+    });
+    ```
+
+  - `withTags(tags)`
+
+    Return a new or existing distribution with the same name as this one, but different tags.
+
+
+## Observers
+
+Observers receive metrics snapshots and either transform them, or forward them to a reporting service (or both). A couple of transforms are included in the library because they're commonly used by reporter plug-ins.
+
+### DeltaObserver
+
+Some metrics databases (like prometheus) can track counters and gauges separately, and want to know the type of each metric. Others (like graphite and influxdb) treat all values as gauges, so counters must be turned into instantaneous values before being reported. `DeltaObserver` does that.
+
+Each time a snapshot is posted, it compares counters to their values at the previous snapshot, and reports the difference. This turns them into a "value per time unit" metric. For example, a "bugs" counter, reported once a minute, would become a "bugs per minute" gauge.
+
+None of the metric names are altered. The new all-gauge snapshot is sent to the any attached observers.
+
+  - `new DeltaObserver(options = {})`
+
+Options:
+
+  - `rank` (array) - described below
+
+Fields and methods:
+
+  - `addObserver(observer)` - just like on `MetricsRegistry`
+  - `observer` - function that can be passed as an observer to `MetricsRegistry`
+
+Typical usage:
+
+```javascript
+const registry = new MetricsRegistry(...);
+const d = new DeltaObserver(...);
+registry.addObserver(d);
+d.addObserver(...);
+```
+
+In the process of converting counters to gauges, a DeltaObserver can also collate counters into a distribution. For example, if you're couting errors per session, you might increment a counter like this:
+
+```javascript
+registry.counter("errors", { session: this.sessionId });
+```
+
+If you then "rank" the errors by session, you can get a histogram and report the median, 90th percentile, and so on. Since a distribution also includes the sum, it will also contain total errors over the same period. To convert tagged metrics into a distribution, you must supply the distinguishing tags, and optionally a new name for the metric. The tagged metrics that are ranked will be omitted from the resulting snapshot.
+
+Each "rank" item is an object with these fields:
+
+  - `match` (string or regex) - The ranking will only apply to metrics with a name that matches.
+  - `tags` (array of string) - These tags will be used to distinguish different samples in the distribution. The distribution will contain any tags from the original counter (or gauge), with these removed.
+  - `name` (optional string) - If this field is present, the distribution will use this name. Otherwise it will preserve the name of the original counter or gauge.
+
+For example, this DeltaObserver will rank errors by sessionId:
+
+```javascript
+const d = new DeltaObserver({
+  rank: [ { match: "errors", tags: [ "session" ], name: "errors_per_session" } ]
+});
+
+registry.counter("errors", { session: this.sessionId, code: 10 });
+// will be reported as a sample in a new metric "errors_per_session{code=10}"
+```
+
+
+### RingBufferObserver
+
+// store metrics in a ring buffer for some amount of time (by default, one hour)
+export default class RingBufferObserver {
+  constructor(registry, span = DEFAULT_SPAN) {
+    this.span = span;
+    if (registry != null) this.register(registry);
+  }
 
 
 
@@ -106,6 +277,3 @@ Methods:
   - `startVizServer(express, registry, port = 8080)`
 
     See the [viz plugin](#viz) below.
-
-
-## Observers
