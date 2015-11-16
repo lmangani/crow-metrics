@@ -36,7 +36,7 @@ export default class RingBufferObserver {
   }
 
   getLatest() {
-    if (this.buffer == null) return {};
+    if (this.buffer == null) return null;
     return this.buffer[(this.index + this.size - 1) % this.size];
   }
 

@@ -10,6 +10,8 @@ This manual is meant to cover every aspect of a fairly tiny library. The section
   - [Counter](#counter)
   - [Distribution](#distribution)
 - [Observers](#observers)
+  - [DeltaObserver](#deltaobserver)
+  - [RingBufferObserver](#ringbufferobserver)
 - [Built-in plugins](#built-in-plugins)
   - [InfluxDB](#influxdb)
   - [Prometheus](#prometheus)
@@ -196,6 +198,7 @@ The upshot is that for small servers, it's equivalent to keeping all the samples
 
 Observers receive metrics snapshots and either transform them, or forward them to a reporting service (or both). A couple of transforms are included in the library because they're commonly used by reporter plug-ins.
 
+
 ### DeltaObserver
 
 Some metrics databases (like prometheus) can track counters and gauges separately, and want to know the type of each metric. Others (like graphite and influxdb) treat all values as gauges, so counters must be turned into instantaneous values before being reported. `DeltaObserver` does that.
@@ -252,12 +255,25 @@ registry.counter("errors", { session: this.sessionId, code: 10 });
 
 ### RingBufferObserver
 
-// store metrics in a ring buffer for some amount of time (by default, one hour)
-export default class RingBufferObserver {
-  constructor(registry, span = DEFAULT_SPAN) {
-    this.span = span;
-    if (registry != null) this.register(registry);
-  }
+A RingBufferObserver saves snapshots in a ring buffer for a specified amount of time (one hour, by default). This is used to power [viz](#viz).
+
+  - `new RingBufferObserver(options = {})`
+
+Options:
+
+  - `span` (in milliseconds) - The ring buffer will be large enough to hold snapshots from this time period. As new snapshots arrive, ones older than this span will be dropped. The default is one hour (3600 * 1000).
+
+Fields and methods:
+
+  - `observer` - function that can be passed as an observer to `MetricsRegistry`
+
+  - `getLatest()` - Return the most recent Snapshot object. This may return `null` if no snapshots have arrived yet.
+
+  - `get()` - Return an array of Snapshot objects, from oldest to newest. The array may be empty if no snapshots have arrived yet.
+
+  - `toJson()` - Return a JSON-friendly representation of the ring buffer.
+
+The JSON-friendly representation is an object with metric names for keys (using the default OpenTSDB-style flattened names) and arrays of numbers for values. The numbers are in order from oldest to newest. If a metric wasn't reported for a particular time, the value will be null. An extra field named `@timestamp` contains an array of the corresponding timestamps for the values.
 
 
 
