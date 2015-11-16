@@ -14,6 +14,7 @@ export default class Distribution {
     this.percentiles = percentiles;
     this.error = error;
     this.distribution = new BiasedQuantileDistribution(this.percentiles, this.error);
+    this.lastUpdated = 0;
   }
 
   /*
@@ -31,6 +32,7 @@ export default class Distribution {
    * add one data point (or more, if an array) to the distribution.
    */
   add(data) {
+    this.lastUpdated = Date.now();
     if (Array.isArray(data)) {
       data.forEach(x => this.distribution.record(x));
     } else {

@@ -178,4 +178,34 @@ describe("MetricsRegistry", () => {
       "prod.racetrack.requests"
     ]);
   });
+
+  it("expires unused counters and distributions", done => {
+    const snapshots = [];
+    const r = new MetricsRegistry({ expire: 25 });
+    r.addObserver(s => snapshots.push(s));
+
+    r.counter("old").increment(5);
+    r.counter("new").increment(5);
+    r.distribution("old2").add(1);
+    r.distribution("new2").add(1);
+    r._publish(Date.now());
+    Array.from(snapshots[0].flatten(n => n).keys()).sort().should.eql([
+      "new", "new2", "old", "old2"
+    ]);
+
+    r._publish(Date.now() + 10);
+    Array.from(snapshots[1].flatten(n => n).keys()).sort().should.eql([
+      "new", "old"
+    ]);
+
+    Promise.delay(25).then(() => {
+      r.counter("new").increment(5);
+      r.distribution("new2").add(1);
+      r._publish(Date.now());
+      Array.from(snapshots[2].flatten(n => n).keys()).sort().should.eql([
+        "new", "new2"
+      ]);
+      done();
+    });
+  });
 });

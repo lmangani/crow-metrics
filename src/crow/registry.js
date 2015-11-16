@@ -32,6 +32,8 @@ const DEFAULT_ERROR = 0.01;
  *   - log: bunyan logger for debugging
  *   - tags: (object) default tags to apply to each metric
  *   - separator: (string) what to use in `withPrefix`; default is "_"
+ *   - expire: (msec) stop reporting counters and distributions that haven't
+ *     been touched in this long
  */
 export default class MetricsRegistry {
   constructor(options = {}) {
@@ -45,6 +47,7 @@ export default class MetricsRegistry {
     this.lastPublish = Date.now();
     this.tags = makeTags(options.tags);
     this.separator = options.separator || "_";
+    this.expire = options.expire;
 
     // if the period is a multiple of minute, 30 sec, 5 sec, or 1 sec, then
     // round the next publish time to that.
@@ -75,6 +78,13 @@ export default class MetricsRegistry {
 
   // timestamp is optional.
   _publish(timestamp) {
+    if (this.expire) {
+      for (const [ key, metric ] of this.metrics) {
+        if (metric.type == "gauge") continue;
+        if (timestamp - metric.lastUpdated >= this.expire) this.metrics.delete(key);
+      }
+    }
+
     const snapshot = this.snapshot(timestamp);
     this.lastPublish = snapshot.timestamp;
     if (this.log) {

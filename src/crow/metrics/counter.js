@@ -8,6 +8,7 @@ export default class Counter {
     this.name = name;
     this.tags = tags;
     this.value = 0;
+    this.lastUpdated = 0;
   }
 
   /*
@@ -31,6 +32,7 @@ export default class Counter {
     if (tags) {
       this.withTags(tags).increment(count);
     } else {
+      this.lastUpdated = Date.now();
       this.value += count;
     }
   }
