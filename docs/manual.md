@@ -68,7 +68,8 @@ Methods:
     Return a registry-like object which prefixes all metric names with the given prefix plus the separator (usually "\_" but set in a `MetricsRegistry` constructor option). The returned object is really a "view" of this registry with each metric name prefixed. For example, the following two lines create or find the same counter:
 
     ```javascript
-    var registry = new crow.MetricsRegistry({ separator: "." });
+    const registry = new crow.MetricsRegistry({ separator: "." });
+
     registry.counter("cats.meals")
     registry.withPrefix("cats").counter("meals")
     ```
@@ -182,7 +183,7 @@ The upshot is that for small servers, it's equivalent to keeping all the samples
     Call `f` as a function, recording the time it takes to complete, in milliseconds. If `f` returns a promise (an object with a field named `then` which is a function), it will record the time it takes the promise to complete. Returns whatever `f` returns, so you can call it inline like:
 
     ```javascript
-    var dbTimer = registry.distribution("db_select_msec");
+    const dbTimer = registry.distribution("db_select_msec");
 
     dbTimer.time(db.select("...")).then(function (rows) {
       // ...
@@ -273,14 +274,57 @@ Fields and methods:
 
   - `toJson()` - Return a JSON-friendly representation of the ring buffer.
 
-The JSON-friendly representation is an object with metric names for keys (using the default OpenTSDB-style flattened names) and arrays of numbers for values. The numbers are in order from oldest to newest. If a metric wasn't reported for a particular time, the value will be null. An extra field named `@timestamp` contains an array of the corresponding timestamps for the values.
+The JSON-friendly representation is an object with metric names for keys (using the default OpenTSDB-style flattened names) and arrays of numbers for values. Distributions are reported as multiple keys, flattened as described in [Snapshot](#snapshot). The numbers are in order from oldest to newest. If a metric wasn't reported for a particular time, the value will be null. An extra field named `@timestamp` contains an array of the corresponding timestamps for the values.
 
 
+## Built-in plugins
+
+### InfluxDB
+
+[InfluxDB](https://influxdb.com/), like Graphite, expects to receive a `POST` containing a summary of metrics from each server at a regular interval.
+
+The influx observer receives each snapshot as it's computed, formats it into a document in InfluxDB format, and posts it to the configured host. You must provide the `request` module, or a module with a similar interface.
+
+```javascript
+const crow = require("crow-metrics");
+const request = require("request");
+
+const registry = new crow.MetricsRegistry();
+crow.exportInflux(registry, request, { hostname: "my.influx.server:8086", database: "mydb" });
+```
+
+  - `exportInflux(registry, request, options = {})`
+
+Options:
+
+  - `hostname` - influxdb host (default: "influxdb.local:8086")
+  - `database` - influxdb database name (default: "test")
+  - `url` - use a custom url, instead of `http://(hostname)/write?db=(database)` (overrides `hostname` and `database` options)
+  - `timeout` (in milliseconds) - how long to wait before giving up (default is 5000, or five seconds)
+  - `log` - bunyan-style log for reporting errors
 
 
-  - `exportInflux(registry, request, options)`
+### Prometheus
 
-    See the [influxdb plugin](#influxdb) below.
+[Prometheus](http://prometheus.io/) polls servers at a regular interval, expecting periodic metric summaries to be available via HTTP.
+
+The prometheus observer attaches to any existing [express](http://expressjs.com/) app, and provides the prometheus text format:
+
+```javascript
+const crow = require("crow-metrics");
+const express = require("express");
+
+const registry = new crow.MetricsRegistry();
+const app = express();
+app.use("/metrics", crow.prometheusExporter(express, registry));
+app.listen(9090);
+```
+
+The above code creates an HTTP server that provides a metrics summary to prometheus on `http://(localhost):9090/metrics`. The summary is updated periodically as configured by the [MetricsRegistry](#metricsregistry) interval.
+
+Counters and gauges are reported as-is, and distribution quantiles are reported as "summary" quantiles, in the format prometheus expects.
+
+
 
   - `prometheusExporter(express, registry)`
 
