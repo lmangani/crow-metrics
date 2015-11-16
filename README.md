@@ -16,18 +16,7 @@ The goal of crow is to make it *dead simple* to collect and report these metrics
 
 - [Example](#example)
 - [How does it work?](#how-does-it-work)
-- [API](#api)
-  - [MetricsRegistry](#metricsregistry)
-  - [Snapshot](#snapshot)
-- [Metrics objects](#metrics-objects)
-  - [Gauge](#gauge)
-  - [Counter](#counter)
-  - [Distribution](#distribution)
-- [How distributions work](#how-distributions-work)
-- [Built-in plugins](#built-in-plugins)
-  - [InfluxDB](#influxdb)
-  - [Prometheus](#prometheus)
-  - [Viz](#viz)
+- [Documentation](docs/manual.md)
 
 
 ## Example
@@ -63,6 +52,14 @@ webService.get("/", function (request, response) {
 ```
 
 
+## More complex example
+
+FIXME
+- use influxdb
+- use a counter-as-rank
+- use a withPrefix
+
+
 ## How does it work?
 
 Metrics consist of:
@@ -90,77 +87,10 @@ Each metric may also have a set of "tags" attached. A tag is a name/value pair, 
 Tags are used by metrics services to split out interesting details while allowing the general case (`requests_handled` above) to be summarized.
 
 
-## API
-
-  - `new MetricsRegistry(options)`
-
-    The registry is the central coordinator for metrics collection and dispersal. It tracks metrics in a single namespace, and periodically takes a snapshot and sends it to any observers. (A typical observer might push the metrics into graphite, riemann, influxdb, or prometheus.)
-
-    Options:
-
-    - `period` (in milliseconds) - how often to send snapshots to observers; default is 60_000, or one minute
-    - `log` - a bunyan-compatible logger to use for debug logs; if no log is provided, nothing is logged
-    - `percentiles` (array) - percentiles to collect on distributions, as a real number between 0 and 1; default is `[ 0.5, 0.9, 0.99 ]`, or the 50th (median), 90th, and 99th percentiles
-    - `error` - number between 0 and 1 representing the rank error allowed when estimating percentiles; default is 0.01 (1%) which is usually fine
-    - `tags` - (object of string keys & string values) set of tags to apply by default to every metric; often used for instance-wide tags like `instanceId` or `hostname`
-    - `separator` - (string) what to use to separate segments in metric names with `withPrefix`
-
-    The `percentiles` and `error` options are used as defaults and may be overridden by individual distributions. For more about how the distributions are calculated, see [distributions](#distributions) below.
-
-  - `exportInflux(registry, request, options)`
-
-    See the [influxdb plugin](#influxdb) below.
-
-  - `prometheusExporter(express, registry)`
-
-    See the [prometheus plugin](#prometheus) below.
-
-  - `viz(express, registry, span = 60 * 60 * 1000)`
-
-    See the [viz plugin](#viz) below.
-
-  - `startVizServer(express, registry, port = 8080)`
-
-    See the [viz plugin](#viz) below.
 
 
-### MetricsRegistry
 
-  - `counter(name, tags = {})`
 
-    Return a new or existing counter with the given name and tags. Counter objects may be cached, or you may call `counter` to look it up each time. See [Metrics objects](#metrics-objects) below for the counter object API.
-
-  - `setGauge(name, tags = {}, getter)`
-
-    Build a new gauge with the given name, tags, and "getter". The "getter" is usually a function that will be called when crow wants to know the current value. If the value changes rarely, `getter` may be a number instead, and you can call `setGauge` with a new number each time the value changes.
-
-  - `gauge(name, tags = {})`
-
-    Return the gauge with the given name and tags. If no such gauge is found, it throws an exception. See [Metrics objects](#metrics-objects) below for the gauge object API.
-
-  - `distribution(name, tags = {}, percentiles = this.percentiles, error = this.error)`
-
-    Return a new or existing distribution with the given name and tags. If `percentiles` or `error` is non-null, they will override the registry defaults. See [Metrics objects](#metrics-objects) below for the distribution object API.
-
-  - `withPrefix(prefix)`
-
-    Return a registry-like object which prefixes all metric names with the given prefix plus the separator (usually "\_" but set in a `MetricsRegistry` constructor option). The returned object is really a "view" of this registry. For example, the following two lines create or find the same counter:
-
-    ```javascript
-    var registry = new crow.MetricsRegistry({ separator: "." });
-    registry.counter("cats.meals")
-    registry.withPrefix("cats").counter("meals")
-    ```
-
-  - `addObserver(observer)`
-
-    Add an observer. The registry maintains an array of observer objects, and sends a snapshot of the current state to each observer at each interval specified by the period of the registry. For example, if the registry's period is 60000, or 60 seconds, then each observer is invoked minutely, at the top of the minute.
-
-    The observers are all expected to be functions that accept one parameter, a snapshot (described below):
-
-      - `function observer(snapshot)`
-
-    A typical observer collects the metrics snapshot and reports it to another service, either by pull (exposing the metrics on a web port) or push (sending them immediately to another server). [Viz](#viz) is an observer that collects an hour of metrics and makes a simple web page summarizing the data.
 
 
 ### Snapshot
