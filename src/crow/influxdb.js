@@ -1,6 +1,6 @@
 "use strict";
 
-import deltaObserver from "./delta";
+import DeltaObserver from "./delta";
 
 /*
  * observer that latches results into a text buffer suitable for sending
@@ -35,7 +35,9 @@ export function influxObserver(registry, observer) {
     observer(lines.join("\n") + "\n");
   }
 
-  return deltaObserver(generate);
+  const d = new DeltaObserver();
+  d.addObserver(generate);
+  return d.observer;
 }
 
 /*

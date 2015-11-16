@@ -2,7 +2,14 @@
 
 import Snapshot from "./snapshot";
 
-class DeltaObserver {
+/*
+ * Convert "counter" metrics into deltas, so that the resulting snapshot is
+ * entirely made up of (gauge-like) simultaneous values.
+ *
+ * Pass in an observer function that will receive the delta'd snapshots as
+ * they are emitted. Returns a wrapped observer that takes normal snapshots.
+ */
+export default class DeltaObserver {
   constructor(options = {}) {
     this.previous = new Map();
     this.rank = options.rank || [];
@@ -13,6 +20,8 @@ class DeltaObserver {
       r.mergeTags = {};
       r.tags.forEach(t => r.mergeTags[t] = null);
     });
+
+    this.observers = [];
   }
 
   compute(snapshot) {
@@ -49,16 +58,23 @@ class DeltaObserver {
 
     return new Snapshot(snapshot.registry, snapshot.timestamp, map);
   }
-}
 
-/*
- * Convert "counter" metrics into deltas, so that the resulting snapshot is
- * entirely made up of (gauge-like) simultaneous values.
- *
- * Pass in an observer function that will receive the delta'd snapshots as
- * they are emitted. Returns a wrapped observer that takes normal snapshots.
- */
-export default function deltaObserver(observer, options) {
-  const d = new DeltaObserver(options);
-  return snapshot => observer(d.compute(snapshot));
+  addObserver(observer) {
+    this.observers.push(observer);
+  }
+
+  apply(snapshot) {
+    const transformed = this.compute(snapshot);
+    this.observers.forEach(x => {
+      try {
+        x(transformed);
+      } catch (error) {
+        console.log(error.stack);
+      }
+    });
+  }
+
+  get observer() {
+    return snapshot => this.apply(snapshot);
+  }
 }

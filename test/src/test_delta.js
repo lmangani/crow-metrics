@@ -1,16 +1,18 @@
 "use strict";
 
-import { MetricsRegistry, deltaObserver } from "../../lib";
+import { MetricsRegistry, DeltaObserver } from "../../lib";
 
 import "should";
 import "source-map-support/register";
 
 
-describe("deltaObserver", () => {
+describe("DeltaObserver", () => {
   it("passes through gauges and distributions unharmed", () => {
     const snapshots = [];
     const r = new MetricsRegistry();
-    r.addObserver(deltaObserver(s => snapshots.push(s)));
+    const d = new DeltaObserver();
+    d.addObserver(s => snapshots.push(s));
+    r.addObserver(d.observer);
 
     r.setGauge("speed", 45);
     r.distribution("timings", { instance: "i-9999" }, [ 0.9 ]).add(10);
@@ -27,7 +29,9 @@ describe("deltaObserver", () => {
   it("computes deltas for counters", () => {
     const snapshots = [];
     const r = new MetricsRegistry();
-    r.addObserver(deltaObserver(s => snapshots.push(s)));
+    const d = new DeltaObserver();
+    d.addObserver(s => snapshots.push(s));
+    r.addObserver(d.observer);
 
     r.counter("tickets").increment(5);
     r._publish();
@@ -44,7 +48,9 @@ describe("deltaObserver", () => {
   it("remembers old values across slow times", () => {
     const snapshots = [];
     const r = new MetricsRegistry();
-    r.addObserver(deltaObserver(s => snapshots.push(s)));
+    const d = new DeltaObserver();
+    d.addObserver(s => snapshots.push(s));
+    r.addObserver(d.observer);
 
     r._publish();
     r.counter("cats").increment(1);
@@ -66,11 +72,13 @@ describe("deltaObserver", () => {
   it("will turn a counter into a distribution, by tag", () => {
     const snapshots = [];
     const r = new MetricsRegistry();
-    r.addObserver(deltaObserver(s => snapshots.push(s), {
+    const d = new DeltaObserver({
       rank: [
         { name: "traffic_per_session", match: "bytes", tags: [ "session" ] }
       ]
-    }));
+    });
+    d.addObserver(s => snapshots.push(s));
+    r.addObserver(d.observer);
 
     r.counter("bytes", { session: "3" }).increment(10);
     r.counter("bytes", { session: "4" }).increment(20);
@@ -88,11 +96,13 @@ describe("deltaObserver", () => {
   it("will preserve other tags when constructing distributions", () => {
     const snapshots = [];
     const r = new MetricsRegistry();
-    r.addObserver(deltaObserver(s => snapshots.push(s), {
+    const d = new DeltaObserver({
       rank: [
         { name: "traffic_per_session", match: "bytes", tags: [ "session" ] }
       ]
-    }));
+    });
+    d.addObserver(s => snapshots.push(s));
+    r.addObserver(d.observer);
 
     r.counter("bytes", { type: "cat", session: "3" }).increment(10);
     r.counter("bytes", { type: "mouse", session: "4" }).increment(20);

@@ -1,7 +1,7 @@
 "use strict";
 
 import BiasedQuantileDistribution from "./crow/bqdist";
-import deltaObserver from "./crow/delta";
+import DeltaObserver from "./crow/delta";
 import { exportInflux, influxObserver } from "./crow/influxdb";
 import { prometheusExporter, PrometheusObserver } from "./crow/prometheus";
 import MetricsRegistry from "./crow/registry";
@@ -10,7 +10,7 @@ import { startVizServer, viz } from "./crow/viz";
 
 export {
   BiasedQuantileDistribution,
-  deltaObserver,
+  DeltaObserver,
   exportInflux,
   influxObserver,
   MetricsRegistry,
