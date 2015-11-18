@@ -20,7 +20,7 @@
     "clean": "rm -rf lib",
     "distclean": "npm run clean && rm -rf node_modules npm-debug.log",
     "prepublish": "npm run build",
-    "test": "npm run build-test && mocha -R spec --colors test/lib --timeout 30000"
+    "test": "npm run build && npm run build-test && mocha -R spec --colors test/lib --timeout 30000"
   },
   "dependencies": {
     "bluebird": "latest"

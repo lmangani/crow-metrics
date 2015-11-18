@@ -44,7 +44,11 @@ export class InfluxObserver {
 
     const document = lines.join("\n") + "\n";
     this.observers.forEach(observer => {
-      observer(document);
+      try {
+        observer(document);
+      } catch (error) {
+        console.log(error.stack);
+      }
     });
   }
 }
@@ -74,6 +78,7 @@ export function exportInflux(registry, request, options = {}) {
 
   const influxObserver = new InfluxObserver(options);
   influxObserver.addObserver(body => {
+    if (options.log) options.log.trace("Sending metrics to influxdb...");
     const requestOptions = {
       method: "post",
       url: options.url || `http://${hostname}/write?db=${database}`,
