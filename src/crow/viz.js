@@ -63,8 +63,8 @@ function mapToObject(map) {
  *     var metrics = new MetricsRegistry();
  *     startVizServer(express, metrics);
  */
-export function startVizServer(express, registry, port = 8080) {
+export function startVizServer(express, registry, port = 8080, span) {
   const app = express();
-  app.use("/", viz(express, registry));
+  app.use("/", viz(express, registry, span));
   app.listen(port);
 }

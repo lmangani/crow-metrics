@@ -324,16 +324,52 @@ The above code creates an HTTP server that provides a metrics summary to prometh
 
 Counters and gauges are reported as-is, and distribution quantiles are reported as "summary" quantiles, in the format prometheus expects.
 
+  - `new PrometheusObserver()`
 
+    Create a new observer that can be added to a [MetricsRegistry](#metricsregistry), like `registry.addObserver(prometheusObserver.observer);`.
 
   - `prometheusExporter(express, registry)`
 
-    See the [prometheus plugin](#prometheus) below.
+    Make a new `PrometheusObserver`, attach it to the given registry, and return an express handler that will respond to requests with a prometheus-style document of metrics.
+
+
+### Viz
+
+For local debugging, sanity checking -- or simply because it's pretty -- you may want to provide a web display of metrics for your server.
+
+Viz attaches a [RingBufferObserver](#ringbufferobserver) to your registry, which collects metrics over a rolling window (one hour, by default), and graphs this data with [peity](http://benpickles.github.io/peity/).
+
+<img src="https://raw.githubusercontent.com/robey/node-crow/master/docs/crow-screenshot.png">
+
+There are two ways to construct the service:
 
   - `viz(express, registry, span = 60 * 60 * 1000)`
 
-    See the [viz plugin](#viz) below.
+    Create an express handler that will respond to a path with the viz interface. This is useful if your server is already using express for other requests.
 
-  - `startVizServer(express, registry, port = 8080)`
+      - `express` - the express module or a compatible one
+      - `registry` - a crow [MetricsRegistry](#metricsregistry)
+      - `span` (in milliseconds) - total span to display in the graphs (default: 1 hour)
 
-    See the [viz plugin](#viz) below.
+    For example:
+
+    ```javascript
+    var app = express();
+    app.use("/admin/viz", crow.viz(express, registry));
+    ```
+
+  - `startVizServer(express, registry, port = 8080, span = 60 * 60 * 1000)`
+
+    Start up the viz site on a devoted port with a new instance of the express (or compatible) server.
+
+    For example:
+
+    ```javascript
+    var crow = require("crow-metrics");
+    var express = require("express");
+
+    var metrics = new crow.MetricsRegistry();
+    crow.startVizServer(express, metrics, 9090);
+    ```
+
+    This will create a page at `http://localhost:9090/`.

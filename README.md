@@ -21,19 +21,19 @@ The goal of crow is to make it *dead simple* to collect and report these metrics
 
 ## Example
 
-Here's a quick example of a web service that counts requests and response times, and publishes them in a format [prometheus](http://prometheus.io/) can poll:
+Here's a quick example of a web service that counts requests and response times, and publishes them in a format [InfluxDB](http://influxdb.com/) can poll:
 
 ```javascript
-var crow = require("crow-metrics");
-var express = require("express");
+const crow = require("crow-metrics");
+const request = require("request");
 
-var webService = express();
+const webService = express();
 
 // one registry to rule them all, publishing once a minute.
-var metrics = new crow.MetricsRegistry({ period: 60000 });
+const metrics = new crow.MetricsRegistry({ period: 60000 });
 
-// publish metrics to /metrics, formatted for prometheus.
-webService.use("/metrics", crow.prometheusExporter(express, metrics));
+// publish metrics to InfluxDB.
+crow.exportInflux(metrics, request, { hostname: "influxdb.prod.example.com", database: "prod" });
 
 // track heap-used as a gauge.
 // the function will be called on-demand, once a minute.
@@ -50,14 +50,6 @@ webService.get("/", function (request, response) {
   });
 });
 ```
-
-
-## More complex example
-
-FIXME
-- use influxdb
-- use a counter-as-rank
-- use a withPrefix
 
 
 ## How does it work?
@@ -85,92 +77,6 @@ Each metric may also have a set of "tags" attached. A tag is a name/value pair, 
   - `requests_handled{exception=AccessDenied}`
 
 Tags are used by metrics services to split out interesting details while allowing the general case (`requests_handled` above) to be summarized.
-
-
-
-
-
-
-
-
-
-
-
-
-## Built-in plugins
-
-### InfluxDB
-
-[InfluxDB](https://influxdb.com/), like Graphite, expects to receive a `POST` containing a summary of metrics from each server at a regular interval.
-
-The influx observer receives each snapshot as it's computed and broadcast by crow, formats it into a document in InfluxDB format, and posts it to the configured host. You must provide the `request` module, or a module with a similar interface.
-
-```javascript
-var crow = require("crow-metrics");
-var request = require("request");
-
-var registry = new crow.MetricsRegistry();
-crow.exportInflux(registry, request, { hostname: "my.influx.server:8086", database: "mydb" });
-```
-
-  - `exportInflux(registry, request, options = {})`
-
-The available options are:
-
-  - `hostname` - influxdb host (default: "influxdb.local:8086")
-  - `database` - influxdb database name (default: "test")
-  - `url` - use a custom url, instead of `http://(hostname)/write?db=(database)` (overrides `hostname` and `database` options)
-  - `timeout` - how long to wait before giving up (msec, default 5000)
-  - `log` - bunyan-style log for reporting errors
-
-
-### Prometheus
-
-[Prometheus](http://prometheus.io/) polls servers at a regular interval, expecting periodic metric summaries to be available via HTTP.
-
-The prometheus observer attaches to any existing [express](http://expressjs.com/) app, and provides the prometheus text format:
-
-```javascript
-var crow = require("crow-metrics");
-var express = require("express");
-
-var registry = new crow.MetricsRegistry();
-var app = express();
-app.use("/metrics", crow.prometheusExporter(express, registry));
-app.listen(9090);
-```
-
-The above code creates an HTTP server on port 9090, and provides a metrics summary to prometheus on the `/metrics` path. The summary is updated periodically as configured by the `MetricsRegistry`.
-
-Counters and gauges are reported as-is, and distribution quantiles are reported as "summary" quantiles, in the format prometheus expects.
-
-
-### Viz
-
-For local debugging, sanity checking -- or simply because it's pretty -- you may want to provide a web display of metrics for your server.
-
-Viz attaches a `RingBufferObserver` to your registry, which collects metrics over a rolling window (one hour, by default), and graphs this data with [peity](http://benpickles.github.io/peity/).
-
-<img src="https://raw.githubusercontent.com/robey/node-crow/master/docs/crow-screenshot.png">
-
-If you want a devoted port for this service:
-
-```javascript
-var crow = require("crow-metrics");
-var express = require("express");
-
-var metrics = new crow.MetricsRegistry();
-crow.startVizServer(express, metrics, 8080);
-```
-
-This will create a page at `http://localhost:8080/`.
-
-If you're already using express for your own services, and want to attach the viz pages to a side path, you can "use" it like this:
-
-```javascript
-var app = express();
-app.use("/admin/viz", crow.viz(express, registry));
-```
 
 
 ## License
