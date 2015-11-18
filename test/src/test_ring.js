@@ -9,7 +9,8 @@ import "source-map-support/register";
 describe("RingBufferObserver", () => {
   it("tracks gauges", () => {
     const r = new MetricsRegistry();
-    const rb = new RingBufferObserver(r);
+    const rb = new RingBufferObserver();
+    r.addObserver(rb.observer);
     r.setGauge("speed", 45);
     r._publish();
     r.setGauge("speed", 55);
@@ -22,7 +23,8 @@ describe("RingBufferObserver", () => {
 
   it("tracks counters", () => {
     const r = new MetricsRegistry();
-    const rb = new RingBufferObserver(r);
+    const rb = new RingBufferObserver();
+    r.addObserver(rb.observer);
     r.counter("bruises").increment();
     r._publish();
     r.counter("bruises").increment();
@@ -40,7 +42,8 @@ describe("RingBufferObserver", () => {
 
   it("tracks distributions", () => {
     const r = new MetricsRegistry();
-    const rb = new RingBufferObserver(r);
+    const rb = new RingBufferObserver();
+    r.addObserver(rb.observer);
     const d = r.distribution("timings", {}, [ 0.5, 0.9 ]);
     d.add(2);
     d.add(5);
@@ -60,7 +63,8 @@ describe("RingBufferObserver", () => {
 
   it("reports missing metrics", () => {
     const r = new MetricsRegistry();
-    const rb = new RingBufferObserver(r);
+    const rb = new RingBufferObserver();
+    r.addObserver(rb.observer);
     r.counter("cats").increment(3);
     r._publish();
     r.counter("cats").increment(2);
@@ -78,7 +82,8 @@ describe("RingBufferObserver", () => {
 
   it("rotates correctly", () => {
     const r = new MetricsRegistry();
-    const rb = new RingBufferObserver(r, r.period * 5);
+    const rb = new RingBufferObserver({ span: r.period * 5 });
+    r.addObserver(rb.observer);
     r.counter("bugs").increment(1);
     r._publish();
     r.counter("bugs").increment(2);
