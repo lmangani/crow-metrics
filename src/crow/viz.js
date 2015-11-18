@@ -20,11 +20,11 @@ const staticPath = path.resolve(require.resolve(".."), "../../static");
  *
  * You can place it at any path you want.
  */
-export function viz(express, registry, span) {
+export function viz(express, registry, options = {}) {
   const router = express.Router();
   router.use("/", express.static(staticPath));
 
-  const ringBuffer = new RingBufferObserver({ span });
+  const ringBuffer = new RingBufferObserver(options);
   registry.addObserver(ringBuffer.observer);
 
   router.get("/history.json", (request, response) => {
@@ -63,8 +63,8 @@ function mapToObject(map) {
  *     var metrics = new MetricsRegistry();
  *     startVizServer(express, metrics);
  */
-export function startVizServer(express, registry, port = 8080, span) {
+export function startVizServer(express, registry, port = 8080, options = {}) {
   const app = express();
-  app.use("/", viz(express, registry, span));
+  app.use("/", viz(express, registry, options));
   app.listen(port);
 }

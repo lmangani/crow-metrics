@@ -71,7 +71,7 @@ describe("viz", () => {
     Object.keys(history).sort().should.eql([
       "@timestamp", "bugs", "speed", "tears{p=0.5}", "tears{p=0.99}", "tears{p=0.9}", "tears{p=count}", "tears{p=sum}"
     ]);
-    history.bugs.should.eql([ null, 5 ]);
+    history.bugs.should.eql([ 23, 5 ]);
     history.speed.should.eql([ 45, 45 ]);
     history["tears{p=count}"].should.eql([ 1, 1 ]);
     history["tears{p=0.5}"].should.eql([ 10, 3 ]);
