@@ -263,6 +263,7 @@ A RingBufferObserver saves snapshots in a ring buffer for a specified amount of 
 Options:
 
   - `span` (in milliseconds) - The ring buffer will be large enough to hold snapshots from this time period. As new snapshots arrive, ones older than this span will be dropped. The default is one hour (3600 * 1000).
+  - Other options are passed to [DeltaObserver](#deltaobserver).
 
 Fields and methods:
 
@@ -344,13 +345,13 @@ Viz attaches a [RingBufferObserver](#ringbufferobserver) to your registry, which
 
 There are two ways to construct the service:
 
-  - `viz(express, registry, span = 60 * 60 * 1000)`
+  - `viz(express, registry, options)`
 
     Create an express handler that will respond to a path with the viz interface. This is useful if your server is already using express for other requests.
 
       - `express` - the express module or a compatible one
       - `registry` - a crow [MetricsRegistry](#metricsregistry)
-      - `span` (in milliseconds) - total span to display in the graphs (default: 1 hour)
+      - `options` - are passed to [RingBufferObserver](#ringbufferobserver) directly
 
     For example:
 
@@ -359,7 +360,7 @@ There are two ways to construct the service:
     app.use("/admin/viz", crow.viz(express, registry));
     ```
 
-  - `startVizServer(express, registry, port = 8080, span = 60 * 60 * 1000)`
+  - `startVizServer(express, registry, port = 8080, options = {})`
 
     Start up the viz site on a devoted port with a new instance of the express (or compatible) server.
 
