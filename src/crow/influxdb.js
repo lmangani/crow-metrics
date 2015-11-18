@@ -5,14 +5,17 @@ import DeltaObserver from "./delta";
 /*
  * observer that transforms a snapshot into a document in influxdb format,
  * and forwards that document to any downstream observers.
+ *
+ * Options: are passed to DeltaObserver.
  */
 export class InfluxObserver {
-  constructor() {
+  constructor(options = {}) {
     this.observers = [];
+    this.options = options;
   }
 
   get observer() {
-    const d = new DeltaObserver();
+    const d = new DeltaObserver(this.options);
     d.addObserver(snapshot => this.generate(snapshot));
     return d.observer;
   }
@@ -62,13 +65,14 @@ export class InfluxObserver {
  *   - url: use a custom url, instead of `http://(hostname)/write?db=(database)`
  *   - timeout: how long to wait before giving up (msec, default 5000)
  *   - log: bunyan-style log for reporting errors
+ *   - rank: passed to DeltaObserver
  */
 export function exportInflux(registry, request, options = {}) {
   const hostname = options.hostname || "influxdb.local:8086";
   const database = options.database || "test";
   const timeout = options.timeout || 5000;
 
-  const influxObserver = new InfluxObserver();
+  const influxObserver = new InfluxObserver(options);
   influxObserver.addObserver(body => {
     const requestOptions = {
       method: "post",

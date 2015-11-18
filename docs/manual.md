@@ -302,6 +302,7 @@ Options:
   - `url` - use a custom url, instead of `http://(hostname)/write?db=(database)` (overrides `hostname` and `database` options)
   - `timeout` (in milliseconds) - how long to wait before giving up (default is 5000, or five seconds)
   - `log` - bunyan-style log for reporting errors
+  - `rank` - passed to [DeltaObserver](#deltaobserver)
 
 
 ### Prometheus
