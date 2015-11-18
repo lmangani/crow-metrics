@@ -1,5 +1,7 @@
 "use strict";
 
+import DeltaObserver from "./delta";
+
 // one hour
 const DEFAULT_SPAN = 60 * 60 * 1000;
 
@@ -9,10 +11,12 @@ export default class RingBufferObserver {
     this.span = options.span || DEFAULT_SPAN;
     this.size = 0;
     this.buffer = null;
+    this.options = options;
   }
 
   get observer() {
-    return snapshot => {
+    const deltaObserver = new DeltaObserver(this.options);
+    deltaObserver.addObserver(snapshot => {
       // initialize if necessary.
       if (this.buffer == null) {
         this.size = Math.round(this.span / snapshot.registry.period);
@@ -22,7 +26,8 @@ export default class RingBufferObserver {
 
       this.buffer[this.index] = snapshot;
       this.index = (this.index + 1) % this.size;
-    };
+    });
+    return deltaObserver.observer;
   }
 
   get() {
@@ -51,21 +56,13 @@ export default class RingBufferObserver {
 
     const json = { "@timestamp": [] };
     names.forEach(name => json[name] = []);
-    const previousCounters = new Map();
 
     records.forEach(record => {
       const seen = new Set();
       json["@timestamp"].push(record.timestamp);
-      for (const [ name, { value, type } ] of record.flatten()) {
+      for (const [ name, { value } ] of record.flatten()) {
         seen.add(name);
-        if (type == "counter") {
-          // skip first data point so we can report deltas instead.
-          const previous = previousCounters.get(name);
-          json[name].push(previous ? value - previous : null);
-          previousCounters.set(name, value);
-        } else {
-          json[name].push(value);
-        }
+        json[name].push(value);
       }
       names.forEach(name => {
         if (!seen.has(name)) json[name].push(null);

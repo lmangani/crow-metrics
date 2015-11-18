@@ -36,8 +36,8 @@ describe("RingBufferObserver", () => {
     r.counter("bruises").increment();
     r.counter("bruises").increment();
     r._publish();
-    rb.toJson()["bruises"].should.eql([ null, 2, 1, 0, 2 ]);
-    rb.getLatest().flatten().get("bruises").value.should.eql(6);
+    rb.toJson()["bruises"].should.eql([ 1, 2, 1, 0, 2 ]);
+    r.counter("bruises").value.should.eql(6);
   });
 
   it("tracks distributions", () => {
@@ -74,10 +74,10 @@ describe("RingBufferObserver", () => {
     r._publish();
     r.counter("dogs").increment(7);
     r._publish();
-    rb.toJson()["cats"].should.eql([ null, 2, 4, 0 ]);
-    rb.toJson()["dogs"].should.eql([ null, null, null, 7 ]);
-    rb.getLatest().flatten().get("cats").value.should.eql(9);
-    rb.getLatest().flatten().get("dogs").value.should.eql(8);
+    rb.toJson()["cats"].should.eql([ 3, 2, 4, 0 ]);
+    rb.toJson()["dogs"].should.eql([ null, null, 1, 7 ]);
+    r.counter("cats").value.should.eql(9);
+    r.counter("dogs").value.should.eql(8);
   });
 
   it("rotates correctly", () => {
@@ -90,16 +90,16 @@ describe("RingBufferObserver", () => {
     r._publish();
     r.counter("bugs").increment(3);
     r._publish();
-    rb.toJson()["bugs"].should.eql([ null, 2, 3 ]);
+    rb.toJson()["bugs"].should.eql([ 1, 2, 3 ]);
     r.counter("bugs").increment(4);
     r._publish();
     r.counter("bugs").increment(5);
     r._publish();
-    rb.toJson()["bugs"].should.eql([ null, 2, 3, 4, 5 ]);
+    rb.toJson()["bugs"].should.eql([ 1, 2, 3, 4, 5 ]);
     r.counter("bugs").increment(6);
     r._publish();
     r.counter("bugs").increment(7);
     r._publish();
-    rb.toJson()["bugs"].should.eql([ null, 4, 5, 6, 7 ]);
+    rb.toJson()["bugs"].should.eql([ 3, 4, 5, 6, 7 ]);
   });
 });
