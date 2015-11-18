@@ -79,6 +79,8 @@ export function exportInflux(registry, request, options = {}) {
   const influxObserver = new InfluxObserver(options);
   influxObserver.addObserver(body => {
     if (options.log) options.log.trace("Sending metrics to influxdb...");
+    if (options.log) options.log.trace(JSON.stringify(body));
+
     const requestOptions = {
       method: "post",
       url: options.url || `http://${hostname}/write?db=${database}`,
@@ -87,8 +89,9 @@ export function exportInflux(registry, request, options = {}) {
       body
     };
 
-    request(requestOptions, error => {
+    request(requestOptions, (error, response) => {
       if (error && options.log) options.log.error({ err: error }, "Unable to write metrics to influxdb");
+      if (options.log) options.log.trace("Influx returned: " + response.statusCode);
     });
   });
 
