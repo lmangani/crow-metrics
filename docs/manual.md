@@ -245,6 +245,8 @@ Each "rank" item is an object with these fields:
   - `match` (string or regex) - The ranking will only apply to metrics with a name that matches.
   - `tags` (array of string) - These tags will be used to distinguish different samples in the distribution. The distribution will contain any tags from the original counter (or gauge), with these removed.
   - `name` (optional string) - If this field is present, the distribution will use this name. Otherwise it will preserve the name of the original counter or gauge.
+  - `percentiles` - to override the registry default
+  - `error` - to override the registry default
 
 For example, this DeltaObserver will rank errors by sessionId:
 

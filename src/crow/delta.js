@@ -44,7 +44,7 @@ export default class DeltaObserver {
           squelch = true;
           const newName = r.name || metric.name;
           const newTags = metric.tags.merge(r.mergeTags);
-          const d = snapshot.registry.distribution(newName, newTags);
+          const d = snapshot.registry.distribution(newName, newTags, r.percentiles, r.error);
           d.add(newValue);
           newDistributions.add(d);
         }
