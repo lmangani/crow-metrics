@@ -11,6 +11,7 @@ import Snapshot from "./snapshot";
  */
 export default class DeltaObserver {
   constructor(options = {}) {
+    this.options = options;
     this.previous = new Map();
     this.rank = options.rank || [];
     // convert 'match' into a regex, and 'tags' into a form suitable for merging.
@@ -34,6 +35,9 @@ export default class DeltaObserver {
       if (metric.type == "counter") {
         const key = metric.name + metric.tags.canonical;
         const delta = value - (this.previous.get(key) || 0);
+        if (delta < 0 && this.options.log) {
+          this.options.log.debug("Negative delta?! " + delta + " - " + key + " - now " + value);
+        }
         this.previous.set(key, value);
         newValue = delta;
       }
