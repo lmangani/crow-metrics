@@ -215,13 +215,15 @@ describe("MetricsRegistry", () => {
     r.addObserver(s => snapshots.push(s));
 
     r.setGauge("aura", () => 23);
+    r.withPrefix("owl").setGauge("spirit", () => 17);
     r._publish(Date.now());
-    Array.from(snapshots[0].flatten(n => n).keys()).sort().should.eql([ "aura" ]);
+    Array.from(snapshots[0].flatten(n => n).keys()).sort().should.eql([ "aura", "owl_spirit" ]);
 
     r._publish(Date.now());
-    Array.from(snapshots[1].flatten(n => n).keys()).sort().should.eql([ "aura" ]);
+    Array.from(snapshots[1].flatten(n => n).keys()).sort().should.eql([ "aura", "owl_spirit" ]);
 
     r.removeGauge("aura");
+    r.withPrefix("owl").removeGauge("spirit");
     r._publish(Date.now());
     Array.from(snapshots[2].flatten(n => n).keys()).sort().should.eql([ ]);
   });

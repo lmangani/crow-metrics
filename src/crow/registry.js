@@ -193,6 +193,7 @@ export default class MetricsRegistry {
       counter: (name, tags) => this.counter(`${prefix}${this.separator}${name}`, tags),
       gauge: (name, tags) => this.gauge(`${prefix}${this.separator}${name}`, tags),
       setGauge: (name, tags, getter) => this.setGauge(`${prefix}${this.separator}${name}`, tags, getter),
+      removeGauge: (name, tags) => this.removeGauge(`${prefix}${this.separator}${name}`, tags),
       distribution: (name, tags, percentiles, error) => {
         return this.distribution(`${prefix}${this.separator}${name}`, tags, percentiles, error);
       },
