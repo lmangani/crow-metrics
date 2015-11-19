@@ -32,7 +32,7 @@ export default class DeltaObserver {
       let newValue = value;
 
       if (metric.type == "counter") {
-        const key = metric.name + "{" + metric.tags.canonical + "}";
+        const key = metric.name + metric.tags.canonical;
         const delta = value - (this.previous.get(key) || 0);
         this.previous.set(key, value);
         newValue = delta;
