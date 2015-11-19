@@ -79,7 +79,6 @@ export function exportInflux(registry, request, options = {}) {
   const influxObserver = new InfluxObserver(options);
   influxObserver.addObserver(body => {
     if (options.log) options.log.trace("Sending metrics to influxdb...");
-    if (options.log) options.log.trace(JSON.stringify(body));
 
     const requestOptions = {
       method: "post",
@@ -96,4 +95,5 @@ export function exportInflux(registry, request, options = {}) {
   });
 
   registry.addObserver(influxObserver.observer);
+  return influxObserver;
 }
