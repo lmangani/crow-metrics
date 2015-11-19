@@ -40,7 +40,7 @@ export default class DeltaObserver {
 
       let squelch = false;
       this.rank.forEach(r => {
-        if (r.match.test(metric.name)) {
+        if (r.match.test(metric.name) && metric.type != "distribution") {
           squelch = true;
           const newName = r.name || metric.name;
           const newTags = metric.tags.merge(r.mergeTags);
