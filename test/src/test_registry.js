@@ -208,4 +208,21 @@ describe("MetricsRegistry", () => {
       done();
     });
   });
+
+  it("removes gauges", () => {
+    const snapshots = [];
+    const r = new MetricsRegistry({ expire: 25 });
+    r.addObserver(s => snapshots.push(s));
+
+    r.setGauge("aura", () => 23);
+    r._publish(Date.now());
+    Array.from(snapshots[0].flatten(n => n).keys()).sort().should.eql([ "aura" ]);
+
+    r._publish(Date.now());
+    Array.from(snapshots[1].flatten(n => n).keys()).sort().should.eql([ "aura" ]);
+
+    r.removeGauge("aura");
+    r._publish(Date.now());
+    Array.from(snapshots[2].flatten(n => n).keys()).sort().should.eql([ ]);
+  });
 });

@@ -163,6 +163,18 @@ export default class MetricsRegistry {
   }
 
   /*
+   * Remove a gauge.
+   */
+  removeGauge(name, tags = null) {
+    const fullname = name + this.tags.merge(makeTags(tags)).canonical;
+    const metric = this.metrics.get(fullname);
+    if (metric === undefined) throw new Error("No such gauge");
+    if (metric.type != "gauge") throw new Error(`${fullname} is a ${metric.type}, not a gauge`);
+    this.metrics.delete(fullname);
+    return metric;
+  }
+
+  /*
    * Fetch the distribution with a given name (and optional tags).
    * If no distribution by that name/tag combination exists, it's generated.
    */
@@ -195,7 +207,7 @@ export default class MetricsRegistry {
     const fullname = name + tags.canonical;
     let metric = this.metrics.get(fullname);
     if (metric !== undefined) {
-      if (metric.constructor != type) {
+      if (metric.type != type.name.toLowerCase()) {
         throw new Error(`${fullname} is already a ${metric.type}`);
       }
       return metric;

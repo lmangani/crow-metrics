@@ -59,6 +59,10 @@ Methods:
 
     Return the gauge with the given name and tags. If no such gauge is found, it throws an exception. See [Metrics objects](#metrics-objects) below for the gauge object API.
 
+  - `removeGauge(name, tags = {})`
+
+    Remove the gauge with the given name and tags. This forcefully "expires" a gauge in the same way that counters and distributions can be implicitly expired with the `expire` option.
+
   - `distribution(name, tags = {}, percentiles = this.percentiles, error = this.error)`
 
     Return a new or existing distribution with the given name and tags. If `percentiles` or `error` is non-null, they will override the registry defaults. See [Metrics objects](#metrics-objects) below for the distribution object API.
