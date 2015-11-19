@@ -57,6 +57,10 @@ export default class DeltaObserver {
       if (!squelch) map.set(metric, newValue);
     }
 
+    // remove state for anything that's been wiped out.
+    const currentKeys = new Set(snapshot.map.keys());
+    for (const key of this.previous.keys()) if (!currentKeys.has(key)) this.previous.delete(key);
+
     // add any new distributions we computed.
     for (const d of newDistributions) map.set(d, d.value);
 
