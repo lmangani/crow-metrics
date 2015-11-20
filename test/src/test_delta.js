@@ -1,5 +1,6 @@
 "use strict";
 
+import Promise from "bluebird";
 import { MetricsRegistry, DeltaObserver } from "../../lib";
 
 import "should";
@@ -67,6 +68,34 @@ describe("DeltaObserver", () => {
     snapshots.length.should.eql(6);
     snapshots.map(s => (s.flatten().get("cats") || {}).value).should.eql([ undefined, 1, 3, 2, 0, 0 ]);
     snapshots.map(s => (s.flatten().get("dogs") || {}).value).should.eql([ undefined, undefined, undefined, 5, 0, 1 ]);
+  });
+
+  it("forgets old values after expiration", done => {
+    const snapshots = [];
+    const r = new MetricsRegistry({ expire: 100 });
+    const d = new DeltaObserver();
+    d.addObserver(s => snapshots.push(s));
+    r.addObserver(d.observer);
+
+    r.counter("cats").increment(5);
+    r._publish();
+    return Promise.delay(50).then(() => {
+      r.counter("cats").increment(6);
+      r._publish();
+      return Promise.delay(150);
+    }).then(() => {
+      r._publish();
+      return Promise.delay(150);
+    }).then(() => {
+      r.counter("cats").increment(2);
+      r._publish();
+
+      snapshots.length.should.eql(4);
+      console.log(snapshots);
+      snapshots.map(s => (s.flatten().get("cats") || {}).value).should.eql([ 5, 6, undefined, 2 ]);
+
+      done();
+    });
   });
 
   it("will turn a counter into a distribution, by tag", () => {

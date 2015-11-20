@@ -78,6 +78,7 @@ export default class MetricsRegistry {
 
   // timestamp is optional.
   _publish(timestamp) {
+    if (!timestamp) timestamp = Date.now();
     if (this.expire) {
       for (const [ key, metric ] of this.metrics) {
         if (metric.type == "gauge") continue;
