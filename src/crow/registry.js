@@ -82,7 +82,10 @@ export default class MetricsRegistry {
     if (this.expire) {
       for (const [ key, metric ] of this.metrics) {
         if (metric.type == "gauge") continue;
-        if (timestamp - metric.lastUpdated >= this.expire) this.metrics.delete(key);
+        if (timestamp - metric.lastUpdated >= this.expire) {
+          metric.reaped = true;
+          this.metrics.delete(key);
+        }
       }
     }
 

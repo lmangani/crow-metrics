@@ -7,8 +7,14 @@ export default class Counter {
     this.registry = registry;
     this.name = name;
     this.tags = tags;
-    this.value = 0;
+    this._value = 0;
     this.lastUpdated = 0;
+    this.reaped = false;
+  }
+
+  get value() {
+    if (this.forwarded) return this.forwarded.value;
+    return this._value;
   }
 
   /*
@@ -32,8 +38,12 @@ export default class Counter {
     if (tags) {
       this.withTags(tags).increment(count);
     } else {
+      if (this.reaped) {
+        if (!this.forwarded || this.forwarded.reaped) this.forwarded = this.registry.counter(this.name, this.tags);
+        return this.forwarded.increment(count);
+      }
       this.lastUpdated = Date.now();
-      this.value += count;
+      this._value += count;
     }
   }
 }

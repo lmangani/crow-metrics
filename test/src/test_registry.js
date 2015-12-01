@@ -209,6 +209,57 @@ describe("MetricsRegistry", () => {
     });
   });
 
+  it("revivifies counters that expired but have live references", done => {
+    const snapshots = [];
+    const r = new MetricsRegistry({ expire: 25 });
+    r.addObserver(s => snapshots.push(s));
+
+    const counter = r.counter("old");
+    counter.reaped.should.eql(false);
+
+    counter.increment(5);
+    r._publish(Date.now());
+    Array.from(snapshots[0].flatten(n => n)).sort().should.eql([
+      [ "old", { type: "counter", value: 5 } ]
+    ]);
+
+    r._publish(Date.now() + 10);
+
+    Promise.delay(25).then(() => {
+      r._publish(Date.now());
+      Array.from(snapshots[2].flatten(n => n)).sort().should.eql([]);
+
+      counter.reaped.should.eql(true);
+      (counter.forwarded == null).should.eql(true);
+      counter.increment(3);
+      counter.reaped.should.eql(true);
+      counter.forwarded.reaped.should.eql(false);
+
+      r._publish(Date.now() + 10);
+      Array.from(snapshots[3].flatten(n => n)).sort().should.eql([
+        [ "old", { type: "counter", value: 3 } ]
+      ]);
+
+      return Promise.delay(25);
+    }).then(() => {
+      r._publish(Date.now());
+      Array.from(snapshots[4].flatten(n => n)).sort().should.eql([]);
+
+      counter.reaped.should.eql(true);
+      counter.forwarded.reaped.should.eql(true);
+      counter.increment(9);
+      counter.reaped.should.eql(true);
+      counter.forwarded.reaped.should.eql(false);
+
+      r._publish(Date.now() + 10);
+      Array.from(snapshots[5].flatten(n => n)).sort().should.eql([
+        [ "old", { type: "counter", value: 9 } ]
+      ]);
+
+      done();
+    });
+  });
+
   it("removes gauges", () => {
     const snapshots = [];
     const r = new MetricsRegistry({ expire: 25 });

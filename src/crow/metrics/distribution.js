@@ -15,6 +15,7 @@ export default class Distribution {
     this.error = error;
     this.distribution = new BiasedQuantileDistribution(this.percentiles, this.error);
     this.lastUpdated = 0;
+    this.reaped = false;
   }
 
   /*
@@ -32,6 +33,13 @@ export default class Distribution {
    * add one data point (or more, if an array) to the distribution.
    */
   add(data) {
+    if (this.reaped) {
+      if (!this.forwarded || this.forwarded.reaped) {
+        this.forwarded = this.registry.distribution(this.name, this.tags, this.percentiles, this.error);
+      }
+      return this.forwarded.add(data);
+    }
+
     this.lastUpdated = Date.now();
     if (Array.isArray(data)) {
       data.forEach(x => this.distribution.record(x));
@@ -41,6 +49,7 @@ export default class Distribution {
   }
 
   get value() {
+    if (this.forwarded) return this.forwarded.value;
     const snapshot = this.distribution.snapshot();
     this.distribution.reset();
     const rv = new Map();
