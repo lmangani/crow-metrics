@@ -78,6 +78,8 @@ describe("DeltaObserver", () => {
     r.addObserver(d.observer);
 
     r.counter("cats").increment(5);
+    r.setGauge("speed", () => 100);
+    r.distribution("bugs").add(23);
     r._publish();
     return Promise.delay(50).then(() => {
       r.counter("cats").increment(6);
@@ -91,9 +93,7 @@ describe("DeltaObserver", () => {
       r._publish();
 
       snapshots.length.should.eql(4);
-      console.log(snapshots);
       snapshots.map(s => (s.flatten().get("cats") || {}).value).should.eql([ 5, 6, undefined, 2 ]);
-
       done();
     });
   });
