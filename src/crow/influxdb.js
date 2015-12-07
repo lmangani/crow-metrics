@@ -90,7 +90,7 @@ export function exportInflux(registry, request, options = {}) {
 
     request(requestOptions, (error, response) => {
       if (error && options.log) options.log.error({ err: error }, "Unable to write metrics to influxdb");
-      if (options.log) options.log.trace("Influx returned: " + response.statusCode);
+      if (options.log) options.log.trace("Influx returned: " + response ? response.statusCode : "(null)");
     });
   });
 
