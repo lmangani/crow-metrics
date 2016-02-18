@@ -137,11 +137,11 @@ export default class BiasedQuantileDistribution {
 }
 
 function computeAllowedRankError(percentiles, error, sampleCount, rank) {
-  return Math.min(...percentiles.map(p => {
-    if (rank <= p * sampleCount) {
-      return rank / p;
-    } else {
-      return (sampleCount - rank) / (1 - p);
-    }
-  })) * 2 * error;
+  let rv = Number.POSITIVE_INFINITY;
+  for (let i = 0; i < percentiles.length; i++) {
+    const p = percentiles[i];
+    const rankError = (rank <= p * sampleCount) ? rank / p : (sampleCount - rank) / (1 - p);
+    if (rankError < rv) rv = rankError;
+  }
+  return rv * 2 * error;
 }
