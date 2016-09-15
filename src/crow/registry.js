@@ -213,7 +213,8 @@ export default class MetricsRegistry {
         return this.distribution(`${prefix}${this.separator}${name}`, tags, percentiles, error);
       },
       withPrefix: (nextPrefix) => this.withPrefix(`${prefix}${this.separator}${nextPrefix}`),
-      addObserver: (x) => this.addObserver(x)
+      addObserver: (x) => this.addObserver(x),
+      addDeltaObserver: (x, options = {}) => this.addDeltaObserver(x, options)
     };
   }
 
