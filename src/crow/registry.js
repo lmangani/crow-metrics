@@ -1,5 +1,6 @@
 "use strict";
 
+import DeltaObserver from "./delta";
 import Distribution from "./metrics/distribution";
 import Counter from "./metrics/counter";
 import Gauge from "./metrics/gauge";
@@ -118,6 +119,16 @@ export default class MetricsRegistry {
    */
   addObserver(observer) {
     this.observers.push(observer);
+  }
+
+  /*
+   * Add an observer, as with `addObserver`, but wrapped in a `DeltaObserver`
+   * (convenience method).
+   */
+  addDeltaObserver(observer, options = {}) {
+    const d = new DeltaObserver(options);
+    d.addObserver(observer);
+    this.addObserver(d.observer);
   }
 
   /*
