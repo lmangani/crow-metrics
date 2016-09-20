@@ -1,0 +1,32 @@
+{
+  "compilerOptions": {
+    "target": "es6",
+    "module": "commonjs",
+    "moduleResolution": "node",
+    "isolatedModules": false,
+    "jsx": "react",
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "noImplicitAny": true,
+    "noImplicitUseStrict": false,
+    "noImplicitReturns": true,
+    "allowUnreachableCode": false,
+    "removeComments": true,
+    "noLib": false,
+    "rootDir": "./",
+    "outDir": "lib/",
+    "preserveConstEnums": true,
+    "sourceMap": true,
+    "suppressImplicitAnyIndexErrors": true
+  },
+  "filesGlob": [
+    "src/**/*.ts",
+    "test/**/*.ts",
+    "node_modules/@types/**/*.ts"
+  ],
+  "compileOnSave": true,
+  "buildOnSave": false,
+  "atom": {
+    "rewriteTsconfig": false
+  }
+}

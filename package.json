@@ -14,29 +14,25 @@
   },
   "license": "Apache-2.0",
   "scripts": {
-    "build": "eslint src test/src && npm run build-source",
-    "build-source": "babel --source-maps --out-dir lib src",
-    "build-test": "babel --source-maps --out-dir test/lib test/src",
+    "build": "tsc -d --declarationDir lib/",
     "clean": "rm -rf lib",
     "distclean": "npm run clean && rm -rf node_modules npm-debug.log",
     "prepublish": "npm run build",
-    "test": "npm run build && npm run build-test && mocha -R spec --colors test/lib --timeout 30000"
+    "test": "npm run build && mocha -R spec --colors lib/test --timeout 30000"
   },
-  "dependencies": {
-    "bluebird": "latest"
-  },
+  "dependencies": {},
   "devDependencies": {
-    "babel-cli": "^6.0.0",
-    "babel-preset-es2015-node4": "^1.0.0",
-    "eslint": "^1.4.1",
-    "mocha": "latest",
-    "should": "latest",
-    "source-map-support": "latest"
+    "@types/mocha": "^2.2.32",
+    "@types/should": "^8.1.30",
+    "mocha": "^3.0.2",
+    "should": "^11.1.0",
+    "source-map-support": "^0.4.2",
+    "typescript": "^2.0.0"
   },
   "engines": {
     "node": ">=4.2.0"
   },
-  "main": "./lib",
+  "main": "./lib/src",
   "files": [
     "doc",
     "lib",

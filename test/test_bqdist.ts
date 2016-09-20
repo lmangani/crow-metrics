@@ -1,24 +1,22 @@
-"use strict";
-
-import { BiasedQuantileDistribution } from "../../lib";
+import { BiasedQuantileDistribution } from "../src";
 
 import "should";
 import "source-map-support/register";
 
 
 class PseudoRandom {
-  constructor(seed) {
-    this.seed = seed;
+  constructor(public seed: number) {
+    // pass.
   }
 
-  next() {
+  next(): number {
     this.seed = (this.seed * 9301 + 49297) % 233280;
     return this.seed / 233280;
   }
 
-  powerDistribution(count, max, exponent) {
+  powerDistribution(count: number, max: number, exponent: number): number[] {
     // ES6 has no "to/until" :(
-    const rv = [];
+    const rv: number[] = [];
     for (let i = 0; i < count; i++) {
       rv.push(Math.floor(Math.pow(this.next(), exponent) * max));
     }
@@ -26,7 +24,7 @@ class PseudoRandom {
   }
 }
 
-function rankError(sortedSamples, percentile, estimate) {
+function rankError(sortedSamples: number[], percentile: number, estimate: number): number {
   const index = Math.floor(percentile * sortedSamples.length);
   let i = 0;
   while (index + i < 0 || index + i >= sortedSamples.length || sortedSamples[index + i] != estimate) {
@@ -36,7 +34,7 @@ function rankError(sortedSamples, percentile, estimate) {
   return Math.abs(i / sortedSamples.length);
 }
 
-function validate(dist, samples) {
+function validate(dist: BiasedQuantileDistribution, samples: number[]): void {
   dist.reset();
   samples.forEach(v => dist.record(v));
   const sorted = samples.slice();

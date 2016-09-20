@@ -1,8 +1,14 @@
-"use strict";
-
 // immutable snapshot of the samples, for calculating percentiles.
-class Snapshot {
-  constructor(dist) {
+export class Snapshot {
+  samples: number[];
+  sampleCount: number;
+  sampleSum: number;
+  deltasWithinBucket: number[];
+  deltasBetweenBuckets: number[];
+  percentiles: number[];
+  error: number;
+
+  constructor(dist: BiasedQuantileDistribution) {
     this.samples = dist.samples.slice();
     this.sampleCount = dist.sampleCount;
     this.sampleSum = dist.sampleSum;
@@ -12,13 +18,13 @@ class Snapshot {
     this.error = dist.error;
   }
 
-  getPercentile(percentile) {
+  getPercentile(percentile: number): number {
     if (this.samples.length == 0) return 0;
     const desiredRank = Math.floor(this.sampleCount * percentile);
     const desiredMaxError = computeAllowedRankError(this.percentiles, this.error, this.sampleCount, desiredRank) / 2;
     let rank = 0;
     let i = 1;
-    const nextRank = i => {
+    const nextRank = (i: number): number => {
       return rank + this.deltasBetweenBuckets[i] + this.deltasWithinBucket[i];
     };
     while (i < this.samples.length && nextRank(i) <= desiredRank + desiredMaxError) {
@@ -40,39 +46,41 @@ class Snapshot {
  * - percentiles: list of desired percentiles (median = 0.5)
  * - error: error allowed in the rank of the reported measurement
  */
-export default class BiasedQuantileDistribution {
-  constructor(percentiles = [ 0.5, 0.9, 0.95 ], error = 0.01) {
-    this.percentiles = percentiles;
-    this.error = error;
-    this.buffer = [];
+export class BiasedQuantileDistribution {
+  buffer: number[] = [];
+  bufferSize: number;
+
+  // 3 parallel arrays to minimize overhead
+  samples: number[] = [];
+  deltasWithinBucket: number[] = []; // "delta" in the paper
+  deltasBetweenBuckets: number[] = []; // "g" in the paper*
+
+  // total samples that there ever were (even the ones we dropped)
+  sampleCount = 0;
+  // sum of all the samples that ever were
+  sampleSum = 0;
+
+  constructor(public percentiles = [ 0.5, 0.9, 0.95 ], public error = 0.01) {
     this.bufferSize = Math.floor(1 / (2 * error));
-    // 3 parallel arrays to minimize overhead
-    this.samples = [];
-    this.deltasWithinBucket = []; // "delta" in the paper
-    this.deltasBetweenBuckets = []; // "g" in the paper*
-    // total samples that there ever were (even the ones we dropped)
-    this.sampleCount = 0;
-    // sum of all the samples that ever were
-    this.sampleSum = 0;
   }
 
   // * academics are not good at naming things.
 
   // add a sample.
-  record(data) {
+  record(data: number) {
     this.buffer.push(data);
     if (this.buffer.length > this.bufferSize) this.flush();
   }
 
   // clear the samples, returning a snapshot of the previous results.
-  resetWithSnapshot() {
+  resetWithSnapshot(): Snapshot {
     const rv = this.snapshot();
     this.reset();
     return rv;
   }
 
   // clear out any previously stored samples, and start over.
-  reset() {
+  reset(): void {
     this.sampleCount = 0;
     this.sampleSum = 0;
     this.samples = [];
@@ -81,7 +89,7 @@ export default class BiasedQuantileDistribution {
   }
 
   // return an immutable view of the current sample set, for querying.
-  snapshot() {
+  snapshot(): Snapshot {
     if (this.buffer.length > 0) this.flush();
     return new Snapshot(this);
   }
@@ -89,7 +97,7 @@ export default class BiasedQuantileDistribution {
   // ----- internals:
 
   // merge-sort the buffer into the existing samples, dropping unneeded ones.
-  flush() {
+  flush(): void {
     this.buffer.sort((a, b) => a - b);
     const bufferLength = this.buffer.length;
 
@@ -131,12 +139,12 @@ export default class BiasedQuantileDistribution {
     this.buffer = [];
   }
 
-  allowedRankError(rank) {
+  allowedRankError(rank: number): number {
     return computeAllowedRankError(this.percentiles, this.error, this.sampleCount, rank);
   }
 }
 
-function computeAllowedRankError(percentiles, error, sampleCount, rank) {
+function computeAllowedRankError(percentiles: number[], error: number, sampleCount: number, rank: number): number {
   let rv = Number.POSITIVE_INFINITY;
   for (let i = 0; i < percentiles.length; i++) {
     const p = percentiles[i];
