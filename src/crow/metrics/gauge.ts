@@ -2,7 +2,7 @@ import { Metric } from "./metric";
 import { MetricName, MetricType } from "../metric_name";
 
 export class Gauge extends Metric {
-  constructor(name: MetricName, private getter?: number | (() => number)) {
+  constructor(name: MetricName<Gauge>, private getter?: number | (() => number)) {
     super(name, MetricType.Gauge);
   }
 
@@ -14,7 +14,7 @@ export class Gauge extends Metric {
     return (this.getter instanceof Function) ? this.getter() : this.getter;
   }
 
-  save(snapshot: Map<MetricName, number>): void {
+  save(snapshot: Map<MetricName<Metric>, number>): void {
     if (this.getter == null) return;
     snapshot.set(this.name, this.value);
   }

@@ -6,7 +6,7 @@ import { MetricName, MetricType } from "../metric_name";
 export abstract class Metric {
   private lastUpdated: number = 0;
 
-  constructor(public name: MetricName, public type: MetricType) {
+  constructor(public name: MetricName<Metric>, public type: MetricType) {
     // pass.
   }
 
@@ -15,5 +15,5 @@ export abstract class Metric {
   }
 
   // save current value(s) into a snapshot.
-  abstract save(snapshot: Map<MetricName, number>): void;
+  abstract save(snapshot: Map<MetricName<Metric>, number>): void;
 }

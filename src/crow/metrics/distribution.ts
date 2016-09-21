@@ -1,4 +1,5 @@
 import { BiasedQuantileDistribution } from "../bqdist";
+import { Gauge } from "./gauge";
 import { Metric } from "./metric";
 import { MetricName, MetricType } from "../metric_name";
 
@@ -7,11 +8,19 @@ import { MetricName, MetricType } from "../metric_name";
  * them based on percentiles requested (median, 90th percentile, and so on).
  */
 export class Distribution extends Metric {
-  distribution: BiasedQuantileDistribution;
+  private distribution: BiasedQuantileDistribution;
+  private percentileGauges: MetricName<Gauge>[];
+  private countGauge: MetricName<Gauge>;
+  private sumGauge: MetricName<Gauge>;
 
-  constructor(name: MetricName, public percentiles: number[], public error: number) {
+  constructor(name: MetricName<Distribution>, public percentiles: number[], public error: number) {
     super(name, MetricType.Distribution);
     this.distribution = new BiasedQuantileDistribution(percentiles, error);
+
+    const baseGauge = MetricName.create<Gauge>(MetricType.Gauge, name.name, name.tags);
+    this.percentileGauges = percentiles.map(p => baseGauge.addTag("p", p.toString()));
+    this.countGauge = baseGauge.addTag("p", "count");
+    this.sumGauge = baseGauge.addTag("p", "sum");
   }
 
   /*
@@ -25,22 +34,17 @@ export class Distribution extends Metric {
     }
   }
 
-  save(snapshot: Map<MetricName, number>): void {
+  save(snapshot: Map<MetricName<Metric>, number>): void {
+    const data = this.distribution.snapshot();
+    this.distribution.reset();
+    if (data.sampleCount == 0) return;
+    for (let i = 0; i < this.percentiles.length; i++) {
+      snapshot.set(this.percentileGauges[i], data.getPercentile(this.percentiles[i]));
+    }
+    snapshot.set(this.countGauge, data.sampleCount);
+    snapshot.set(this.sumGauge, data.sampleSum);
   }
 
-//   get value() {
-//     const snapshot = this.distribution.snapshot();
-//     this.distribution.reset();
-//     const rv = new Map();
-//     if (snapshot.sampleCount == 0) return rv;
-//     this.percentiles.forEach(p => {
-//       rv.set(p.toString(), snapshot.getPercentile(p));
-//     });
-//     rv.set("count", snapshot.sampleCount);
-//     rv.set("sum", snapshot.sampleSum);
-//     return rv;
-//   }
-//
 //   /*
 //    * time a function call and record it (in milliseconds).
 //    * if the function returns a promise, the recorded time will cover the time

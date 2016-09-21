@@ -4,6 +4,10 @@ import "should";
 import "source-map-support/register";
 
 
+function delay(msec: number): Promise<any> {
+  return new Promise(resolve => setTimeout(resolve, msec));
+}
+
 describe("MetricsRegistry", () => {
   it("remembers counters", () => {
     const r = new MetricsRegistry();
@@ -51,41 +55,39 @@ describe("MetricsRegistry", () => {
     r.snapshot().toString().should.eql("Snapshot(height=78)");
   });
 
-//   it("remembers distributions", () => {
-//     const r = new MetricsRegistry();
-//     const d = r.distribution("stars", {}, [ 0.5, 0.9 ]);
-//     d.add([ 10, 20, 30 ]);
-//     Array.from(d.value).should.eql([
-//       [ "0.5", 20 ],
-//       [ "0.9", 30 ],
-//       [ "count", 3 ],
-//       [ "sum", 60 ]
-//     ]);
-//
-//     const d2 = r.distribution("stars", { galaxy: "1a" }, [ 0.5, 0.9 ]);
-//     d2.add([ 100, 300, 500 ]);
-//     const map = r.distribution("stars", { galaxy: "1a" }).value;
-//     Array.from(map).should.eql([
-//       [ "0.5", 300 ],
-//       [ "0.9", 500 ],
-//       [ "count", 3 ],
-//       [ "sum", 900 ]
-//     ]);
-//   });
-//
-//   it("records times in distributions", done => {
-//     const r = new MetricsRegistry();
-//     const d = r.distribution("stars", {}, [ 0.5, 0.9 ]);
-//     d.time(() => "hi").should.eql("hi");
-//     d.time(() => Promise.delay(50).then(() => 99)).then(rv => {
-//       rv.should.eql(99);
-//       const stats = d.value;
-//       stats.get("count").should.eql(2);
-//       stats.get("sum").should.be.greaterThan(49);
-//       stats.get("0.5").should.be.greaterThan(49);
-//       done();
-//     });
-//   });
+  it("remembers distributions", () => {
+    const r = new MetricsRegistry();
+    const d = r.distribution("stars", {}, [ 0.5, 0.9 ]);
+    r.addDistribution(d, [ 10, 20, 30 ]);
+    r.snapshot().toString().should.eql("Snapshot(" + [
+      "stars{p=0.5}=20",
+      "stars{p=0.9}=30",
+      "stars{p=count}=3",
+      "stars{p=sum}=60"
+    ].join(", ") + ")");
+
+    const d2 = r.distribution("stars", { galaxy: "1a" }, [ 0.5, 0.9 ]);
+    r.addDistribution(d2, [ 100, 300, 500 ]);
+    r.snapshot().toString().should.eql("Snapshot(" + [
+      "stars{galaxy=1a,p=0.5}=300",
+      "stars{galaxy=1a,p=0.9}=500",
+      "stars{galaxy=1a,p=count}=3",
+      "stars{galaxy=1a,p=sum}=900"
+    ].join(", ") + ")");
+  });
+
+  it("records times in distributions", () => {
+    const r = new MetricsRegistry();
+    const d = r.distribution("stars", {}, [ 0.5, 0.9 ]);
+    r.time(d, () => "hi").should.eql("hi");
+    return r.timePromise(d, () => delay(50).then(() => 99)).then(rv => {
+      rv.should.eql(99);
+      const snapshot = r.snapshot().flatten();
+      snapshot.get("stars{p=count}").should.eql(2);
+      snapshot.get("stars{p=sum}").should.be.greaterThan(49);
+      snapshot.get("stars{p=0.5}").should.be.greaterThan(49);
+    });
+  });
 
   it("tracks tags", () => {
     const r = new MetricsRegistry();
@@ -117,27 +119,27 @@ describe("MetricsRegistry", () => {
 //       `f{instance=i-2222,p=sum}`
 //     ]);
 //   });
-//
-//   it("makes a snapshot", () => {
-//     const r = new MetricsRegistry();
-//     r.counter("buckets", { city: "San Jose" }).increment(10);
-//     r.counter("cats").increment(900);
-//     r.counter("buckets", { contents: "fire" }).increment(3);
-//     r.setGauge("speed", 150);
-//     r.distribution("stars").withTags({ galaxy: "1a" }).add([ 90, 100, 110 ]);
-//     Array.from(r.snapshot().flatten()).sort().should.eql([
-//       [ "buckets{city=San Jose}", { value: 10, type: "counter" } ],
-//       [ "buckets{contents=fire}", { value: 3, type: "counter" } ],
-//       [ "cats", { value: 900, type: "counter" } ],
-//       [ "speed", { value: 150, type: "gauge" } ],
-//       [ "stars{galaxy=1a,p=0.5}", { value: 100, type: "distribution" } ],
-//       [ "stars{galaxy=1a,p=0.99}", { value: 110, type: "distribution" } ],
-//       [ "stars{galaxy=1a,p=0.9}", { value: 110, type: "distribution" } ],
-//       [ "stars{galaxy=1a,p=count}", { value: 3, type: "distribution" } ],
-//       [ "stars{galaxy=1a,p=sum}", { value: 300, type: "distribution" } ]
-//     ]);
-//   });
-//
+
+  it("makes a snapshot", () => {
+    const r = new MetricsRegistry();
+    r.increment(r.counter("buckets", { city: "San Jose" }), 10);
+    r.increment(r.counter("cats"), 900);
+    r.increment(r.counter("buckets", { contents: "fire" }),3);
+    r.setGauge(r.gauge("speed"), 150);
+    r.addDistribution(r.distribution("stars").addTags({ galaxy: "1a" }), [ 90, 100, 110 ]);
+    Array.from(r.snapshot().flatten()).sort().should.eql([
+      [ "buckets{city=San Jose}", 10 ],
+      [ "buckets{contents=fire}", 3 ],
+      [ "cats", 900 ],
+      [ "speed", 150 ],
+      [ "stars{galaxy=1a,p=0.5}", 100 ],
+      [ "stars{galaxy=1a,p=0.99}", 110 ],
+      [ "stars{galaxy=1a,p=0.9}", 110 ],
+      [ "stars{galaxy=1a,p=count}", 3 ],
+      [ "stars{galaxy=1a,p=sum}", 300 ]
+    ]);
+  });
+
 //   it("publishes to observers", done => {
 //     const captured = [];
 //     const r = new MetricsRegistry({ period: 10 });

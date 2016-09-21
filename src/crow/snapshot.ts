@@ -8,7 +8,7 @@ import { MetricsRegistry } from "./registry";
  * values, where the value may be a `Number` or `Map(String -> Number)`.
  */
 export class Snapshot {
-  constructor(public registry: MetricsRegistry, public timestamp: number, public map: Map<MetricName, number>) {
+  constructor(public registry: MetricsRegistry, public timestamp: number, public map: Map<MetricName<Metric>, number>) {
     // pass.
   }
 
@@ -18,7 +18,9 @@ export class Snapshot {
    * generates the canonical (OpenTSDB-style) name, like
    * `name{tag=value,tag=value}`.
    */
-  flatten(formatter: ((name: MetricName) => string) = (name: MetricName) => name.format()): Map<string, number> {
+  flatten(
+    formatter: ((name: MetricName<Metric>) => string) = (name: MetricName<Metric>) => name.format()
+  ): Map<string, number> {
     const map = new Map();
     for (const [ metric, value ] of this.map) {
       if (value == null || value === undefined) continue;
