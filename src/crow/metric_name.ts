@@ -21,10 +21,12 @@ export enum MetricType {
 export class MetricName<T> {
   private _canonical: string;
 
+  // internally, tags are a single array of [ key, value, key, value, ...] to save space.
   private constructor(
     public type: MetricType,
     public name: string,
-    public tags: Map<string, string>,
+    public tags: string[],
+    public parent: MetricName<any>,
     public maker?: (name: MetricName<T>) => T
   ) {
     this._canonical = this.format();
@@ -40,8 +42,17 @@ export class MetricName<T> {
     formatter: ((key: string, value: string) => string) = (k, v) => k + "=" + v,
     joiner: ((list: string[]) => string) = list => "{" + list.join(",") + "}"
   ): string {
-    if (this.tags.size == 0) return this.name;
-    return this.name + joiner(Array.from(this.tags).map(([ k, v ]) => formatter(k, v)).sort());
+    if (this.tags.length == 0) return this.name;
+    const map = new Map<string, string>();
+    this.tagsToMap(map);
+    return this.name + joiner(Array.from(map.entries()).map(([ k, v ]) => formatter(k, v)).sort());
+  }
+
+  private tagsToMap(map: Map<string, string>): void {
+    if (this.parent) this.parent.tagsToMap(map);
+    for (let i = 0; i < this.tags.length; i += 2) {
+      map.set(this.tags[i], this.tags[i + 1]);
+    }
   }
 
   // for use as string keys in the registry.
@@ -49,8 +60,12 @@ export class MetricName<T> {
     return this._canonical;
   }
 
-  private withNewTags(tags: Map<string, string>): MetricName<T> {
-    return new MetricName<T>(this.type, this.name, tags, this.maker);
+  private withExtraTags(tags: string[]): MetricName<T> {
+    return new MetricName<T>(this.type, this.name, tags, this, this.maker);
+  }
+
+  private withReplacedTags(tags: string[]): MetricName<T> {
+    return new MetricName<T>(this.type, this.name, tags, null, this.maker);
   }
 
   /*
@@ -58,37 +73,39 @@ export class MetricName<T> {
    * tags passed in.
    */
   addTags(other: Tags): MetricName<T> {
-    const newTags = new Map(this.tags[Symbol.iterator]());
-    for (const [ k, v ] of (other instanceof Map) ? other : objToMap(other)) newTags.set(k, v);
-    return this.withNewTags(newTags);
+    return this.withExtraTags(other instanceof Map ? mapToList(other) : objToList(other));
   }
 
   /*
    * Return a new MetricName with the given tag added.
    */
   addTag(key: string, value: string): MetricName<T> {
-    const newTags = new Map(this.tags[Symbol.iterator]());
-    newTags.set(key, value);
-    return this.withNewTags(newTags);
+    return this.withExtraTags([ key, value ]);
   }
 
   /*
    * Return a new MetricName with the given tag(s) removed.
    */
   removeTags(...keys: string[]): MetricName<T> {
-    const newTags = new Map(this.tags[Symbol.iterator]());
-    keys.forEach(key => newTags.delete(key));
-    return this.withNewTags(newTags);
+    const map = new Map<string, string>();
+    this.tagsToMap(map);
+    keys.forEach(key => map.delete(key));
+    return this.withReplacedTags([].concat.apply([], Array.from(map.entries())));
   }
 
-  static create<T>(type: MetricType, name: string, tags?: Tags, maker?: (name: MetricName<T>) => T): MetricName<T> {
-    if (tags == null) return new MetricName(type, name, NoTags, maker);
-    if (tags instanceof Map) {
-      // es6 has a crazy way to clone a map!
-      return new MetricName(type, name, new Map(tags[Symbol.iterator]()), maker);
-    } else {
-      return new MetricName(type, name, objToMap(tags), maker);
-    }
+  withType<U>(type: MetricType): MetricName<U> {
+    return new MetricName<U>(type, this.name, this.tags, this.parent);
+  }
+
+  static create<T>(
+    type: MetricType,
+    name: string,
+    tags?: Tags,
+    parent?: MetricName<any>,
+    maker?: (name: MetricName<T>) => T
+  ): MetricName<T> {
+    if (tags == null) return new MetricName(type, name, [], parent, maker);
+    return new MetricName(type, name, (tags instanceof Map) ? mapToList(tags) : objToList(tags), parent, maker);
   }
 }
 
@@ -98,4 +115,12 @@ const NoTags = new Map<string, string>();
 
 function objToMap(obj: Object): Map<string, string> {
   return new Map(Object.keys(obj).map(k => [ k, obj[k].toString() ] as [ string, string ]));
+}
+
+function objToList(obj: Object): string[] {
+  return [].concat.apply([], Object.keys(obj).map(k => [ k, obj[k].toString() ]));
+}
+
+function mapToList(map: Map<string, string>): string[] {
+  return [].concat.apply([], Array.from(map.entries()));
 }

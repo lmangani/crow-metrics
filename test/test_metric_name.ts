@@ -22,8 +22,7 @@ describe("MetricName", () => {
 
   it("merges two tags", () => {
     const name1 = MetricName.create(MetricType.Counter, "foo", { one: "1", three: "3" });
-    const name2 = MetricName.create(MetricType.Counter, "foo", { one: "2", two: "2" });
-    name1.addTags(name2.tags).canonical.should.eql("foo{one=2,three=3,two=2}");
+    name1.addTags({ one: "2", two: "2" }).canonical.should.eql("foo{one=2,three=3,two=2}");
   });
 
   it("adds and removes tags", () => {

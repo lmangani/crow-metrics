@@ -6,8 +6,18 @@ import { Gauge } from "./metrics/gauge";
 import { MetricName, MetricType, Tags } from "./metric_name";
 import { Snapshot } from "./snapshot";
 
+declare var require: any;
+
 const DEFAULT_PERCENTILES = [ 0.5, 0.9, 0.99 ];
 const DEFAULT_ERROR = 0.01;
+
+export type Observer = (snapshot: Snapshot) => void;
+
+export interface BunyanLike {
+  error(data: any, text: string): void;
+  info(text: string): void;
+  trace(text: string): void;
+}
 
 export interface RegistryOptions {
   // default tags to apply to each metric:
@@ -21,6 +31,15 @@ export interface RegistryOptions {
 
   // default error to allow on distribution ranks
   error?: number;
+
+  // (msec) how often to send snapshots to observers
+  period?: number;
+
+  // (msec) stop reporting counters and distributions that haven't been touched in this long
+  expire?: number;
+
+  // bunyan(-like) logger for debugging
+  log?: BunyanLike;
 }
 
 /*
@@ -39,104 +58,102 @@ export interface RegistryOptions {
  *   - value: Number or Map(String -> Number)
  *
  * options:
- *   - period: (msec) how often to send snapshots to observers
  *   - log: bunyan logger for debugging
- *   - expire: (msec) stop reporting counters and distributions that haven't
- *     been touched in this long
  */
 export class MetricsRegistry {
   // metrics are stored by their "fully-qualified" name, using stringified tags.
   metrics: Map<string, Metric> = new Map();
 
+  private observers: Observer[] = [];
+
   private percentiles: number[] = DEFAULT_PERCENTILES;
   private error: number = DEFAULT_ERROR;
 
-  private tags: Tags = null;
+  private baseMetric?: MetricName<any> = null;
   private separator = "_";
   private currentTime = Date.now();
+  private version = "?";
+  private log: BunyanLike = null;
+
+  private period = 60000;
+  private expire = 0;
+  private periodRounding = 1;
+  private lastPublish = Date.now();
 
   constructor(options: RegistryOptions = {}) {
-//     this.observers = [];
-//     this.period = options.period || 60000;
+    if (options.period) this.period = options.period;
+    if (options.expire) this.expire = options.expire;
     if (options.percentiles) this.percentiles = options.percentiles;
     if (options.error) this.error = options.error;
-//     this.log = options.log;
-//     this.lastPublish = Date.now();
-    this.tags = options.tags;
+    if (options.log) this.log = options.log;
+    if (options.tags) {
+      this.baseMetric = MetricName.create(MetricType.Gauge, "", options.tags);
+    }
     if (options.separator) this.separator = options.separator;
-//     this.expire = options.expire;
-//
-//     // if the period is a multiple of minute, 30 sec, 5 sec, or 1 sec, then
-//     // round the next publish time to that.
-//     this.periodRounding = 1;
-//     [ 60000, 30000, 15000, 10000, 5000, 1000 ].forEach((r) => {
-//       if (this.periodRounding == 1 && this.period % r == 0) {
-//         this.periodRounding = r;
-//       }
-//     });
-//
-//     this._schedulePublish();
-//
-//     this.version = "?";
-//     try {
-//       this.version = require("../../package.json").version;
-//     } catch (error) {
-//       // don't worry about it.
-//     }
-//     if (this.log) this.log.info(`crow-metrics ${this.version} started; period_sec=${this.period / 1000}`);
+
+    // if the period is a multiple of minute, 30 sec, 5 sec, or 1 sec, then
+    // round the next publish time to that.
+    this.periodRounding = 1;
+    [ 60000, 30000, 15000, 10000, 5000, 1000 ].forEach(r => {
+      if (this.periodRounding == 1 && this.period % r == 0) {
+        this.periodRounding = r;
+      }
+    });
+
+    this.schedulePublish();
+
+    try {
+      this.version = require("../../package.json").version;
+    } catch (error) {
+      // don't worry about it.
+    }
+    if (this.log) this.log.info(`crow-metrics ${this.version} started; period_sec=${this.period / 1000}`);
   }
 
-//   _schedulePublish() {
-//     const nextTime = Math.round((this.lastPublish + this.period) / this.periodRounding) * this.periodRounding;
-//     let duration = nextTime - Date.now();
-//     while (duration < 0) duration += this.period;
-//     setTimeout(() => this._publish(nextTime), duration);
-//   }
-//
-//   // timestamp is optional.
-//   _publish(timestamp) {
-//     if (!timestamp) timestamp = Date.now();
-//     if (this.expire) {
-//       for (const [ key, metric ] of this.metrics) {
-//         if (metric.type == "gauge") continue;
-//         if (timestamp - metric.lastUpdated >= this.expire) {
-//           metric.reaped = true;
-//           this.metrics.delete(key);
-//         }
-//       }
-//     }
-//
-//     const snapshot = this.snapshot(timestamp);
-//     this.lastPublish = snapshot.timestamp;
-//     if (this.log) {
-//       this.log.trace(`Publishing ${this.metrics.size} metrics to ${this.observers.length} observers.`);
-//     }
-//
-//     this.observers.forEach(observer => {
-//       try {
-//         observer(snapshot);
-//       } catch (error) {
-//         if (this.log) this.log.error({ err: error }, "Error in crow observer (skipping)");
-//         // there may be no other way for someone to see there was an error:
-//         console.log(error.stack);
-//       }
-//     });
-//
-//     this._schedulePublish();
-//   }
-//
-//   /*
-//    * Add an observer, which should be a function:
-//    *
-//    *     function observer(snapshot)
-//    *
-//    * The snapshot is an object with a timestamp and a map of metrics to
-//    * values. (See `Snapshot` for details.)
-//    */
-//   addObserver(observer) {
-//     this.observers.push(observer);
-//   }
-//
+  private schedulePublish(): void {
+    const nextTime = Math.round((this.lastPublish + this.period) / this.periodRounding) * this.periodRounding;
+    let duration = nextTime - Date.now();
+    while (duration < 0) duration += this.period;
+    setTimeout(() => this.publish(nextTime), duration);
+  }
+
+  // timestamp is optional.
+  private publish(timestamp: number): void {
+    if (!timestamp) timestamp = Date.now();
+    if (this.expire) {
+      for (const [ key, metric ] of this.metrics) {
+        if (metric.type == MetricType.Gauge) continue;
+        if (metric.isExpired(timestamp, this.expire)) this.metrics.delete(key);
+      }
+    }
+
+    const snapshot = this.snapshot(timestamp);
+    this.lastPublish = snapshot.timestamp;
+    if (this.log) {
+      this.log.trace(`Publishing ${this.metrics.size} metrics to ${this.observers.length} observers.`);
+    }
+
+    this.observers.forEach(observer => {
+      try {
+        observer(snapshot);
+      } catch (error) {
+        if (this.log) this.log.error({ err: error }, "Error in crow observer (skipping)");
+        // there may be no other way for someone to see there was an error:
+        console.log(error.stack);
+      }
+    });
+
+    this.schedulePublish();
+  }
+
+  /*
+   * Add an observer, which receives a periodic snapshot of metrics.
+   * (See `Snapshot` for details.)
+   */
+  addObserver(observer: Observer): void {
+    this.observers.push(observer);
+  }
+
 //   /*
 //    * Add an observer, as with `addObserver`, but wrapped in a `DeltaObserver`
 //    * (convenience method).
@@ -162,7 +179,8 @@ export class MetricsRegistry {
    * Find or create a counter with the given name and optional tags.
    */
   counter(name: string, tags?: Tags): MetricName<Counter> {
-    const metricName = MetricName.create(MetricType.Counter, name, tags, (x: MetricName<Counter>) => new Counter(x));
+    const maker = (x: MetricName<Counter>) => new Counter(x);
+    const metricName = MetricName.create(MetricType.Counter, name, tags, this.baseMetric, maker);
     this.getOrMake(metricName);
     return metricName;
   }
@@ -180,7 +198,7 @@ export class MetricsRegistry {
    * Find or create a gauge with the given name and optional tags.
    */
   gauge(name: string, tags?: Tags): MetricName<Gauge> {
-    const metricName = MetricName.create(MetricType.Gauge, name, tags, (x: MetricName<Gauge>) => new Gauge(x));
+    const metricName = MetricName.create(MetricType.Gauge, name, tags, this.baseMetric, (x: MetricName<Gauge>) => new Gauge(x));
     this.getOrMake(metricName);
     return metricName;
   }
@@ -217,7 +235,7 @@ export class MetricsRegistry {
     error = this.error
   ): MetricName<Distribution> {
     const maker = (x: MetricName<Distribution>) => new Distribution(x, percentiles, error);
-    const metricName = MetricName.create(MetricType.Distribution, name, tags, maker);
+    const metricName = MetricName.create(MetricType.Distribution, name, tags, this.baseMetric, maker);
     this.getOrMake(metricName);
     return metricName;
   }

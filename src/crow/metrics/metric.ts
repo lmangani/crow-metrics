@@ -14,6 +14,10 @@ export abstract class Metric {
     this.lastUpdated = time;
   }
 
+  isExpired(timestamp: number, expire: number): boolean {
+    return timestamp - this.lastUpdated >= expire;
+  }
+
   // save current value(s) into a snapshot.
   abstract save(snapshot: Map<MetricName<Metric>, number>): void;
 }

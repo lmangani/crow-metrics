@@ -1,4 +1,4 @@
-import { MetricsRegistry, MetricType } from "../src";
+import { MetricsRegistry, MetricType, Snapshot } from "../src";
 
 import "should";
 import "source-map-support/register";
@@ -97,28 +97,28 @@ describe("MetricsRegistry", () => {
     r.snapshot().toString().should.eql("Snapshot(buckets{city=San Jose}=3, buckets{contents=fire}=10)");
   });
 
-//   it("honors default tags", () => {
-//     const r = new MetricsRegistry({ tags: { instance: "i-ffff" } });
-//     r.counter("a", { city: "San Jose" });
-//     r.counter("b", { instance: "i-0000" });
-//     r.setGauge("c", { city: "Berryessa" }, 100);
-//     r.setGauge("d", { instance: "i-1111" }, 100);
-//     r.distribution("e", { city: "Alum Rock" }, [ 0.5 ]).add(1);
-//     r.distribution("f", { instance: "i-2222" }, [ 0.5 ]).add(1);
-//
-//     Array.from(r.snapshot().flatten().keys()).sort().should.eql([
-//       `a{city=San Jose,instance=i-ffff}`,
-//       `b{instance=i-0000}`,
-//       `c{city=Berryessa,instance=i-ffff}`,
-//       `d{instance=i-1111}`,
-//       `e{city=Alum Rock,instance=i-ffff,p=0.5}`,
-//       `e{city=Alum Rock,instance=i-ffff,p=count}`,
-//       `e{city=Alum Rock,instance=i-ffff,p=sum}`,
-//       `f{instance=i-2222,p=0.5}`,
-//       `f{instance=i-2222,p=count}`,
-//       `f{instance=i-2222,p=sum}`
-//     ]);
-//   });
+  it("honors default tags", () => {
+    const r = new MetricsRegistry({ tags: { instance: "i-ffff" } });
+    r.counter("a", { city: "San Jose" });
+    r.counter("b", { instance: "i-0000" });
+    r.setGauge(r.gauge("c", { city: "Berryessa" }), 100);
+    r.setGauge(r.gauge("d", { instance: "i-1111" }), 100);
+    r.addDistribution(r.distribution("e", { city: "Alum Rock" }, [ 0.5 ]), 1);
+    r.addDistribution(r.distribution("f", { instance: "i-2222" }, [ 0.5 ]), 1);
+
+    Array.from(r.snapshot().flatten().keys()).sort().should.eql([
+      `a{city=San Jose,instance=i-ffff}`,
+      `b{instance=i-0000}`,
+      `c{city=Berryessa,instance=i-ffff}`,
+      `d{instance=i-1111}`,
+      `e{city=Alum Rock,instance=i-ffff,p=0.5}`,
+      `e{city=Alum Rock,instance=i-ffff,p=count}`,
+      `e{city=Alum Rock,instance=i-ffff,p=sum}`,
+      `f{instance=i-2222,p=0.5}`,
+      `f{instance=i-2222,p=count}`,
+      `f{instance=i-2222,p=sum}`
+    ]);
+  });
 
   it("makes a snapshot", () => {
     const r = new MetricsRegistry();
@@ -140,28 +140,27 @@ describe("MetricsRegistry", () => {
     ]);
   });
 
-//   it("publishes to observers", done => {
-//     const captured = [];
-//     const r = new MetricsRegistry({ period: 10 });
-//     r.addObserver(snapshot => captured.push(snapshot));
-//     r.counter("buckets").increment(5);
-//     setTimeout(() => {
-//       r.counter("buckets").increment(3);
-//       setTimeout(() => {
-//         captured.length.should.eql(2);
-//         Array.from(captured[0].flatten()).should.eql([ [ "buckets", { value: 5, type: "counter" } ] ]);
-//         Array.from(captured[1].flatten()).should.eql([ [ "buckets", { value: 8, type: "counter" } ] ]);
-//         (captured[1].timestamp - captured[0].timestamp).should.be.greaterThan(8);
-//         done();
-//       }, 13);
-//     }, 13);
-//   });
+  it("publishes to observers", () => {
+    const captured: Snapshot[] = [];
+    const r = new MetricsRegistry({ period: 10 });
+    r.addObserver(snapshot => captured.push(snapshot));
+    r.increment(r.counter("buckets"), 5);
+    return delay(13).then(() => {
+      r.increment(r.counter("buckets"), 3);
+      return delay(13).then(() => {
+        captured.length.should.eql(2);
+        Array.from(captured[0].flatten()).should.eql([ [ "buckets", 5 ] ]);
+        Array.from(captured[1].flatten()).should.eql([ [ "buckets", 8 ] ]);
+        (captured[1].timestamp - captured[0].timestamp).should.be.greaterThan(8);
+      });
+    });
+  });
 
   it("refuses to let two metrics have the same name", () => {
     const r = new MetricsRegistry();
     r.setGauge(r.gauge("buckets"), 10);
     (() => r.counter("buckets")).should.throw("buckets is already a Gauge");
-    // (() => r.distribution("buckets")).should.throw("buckets is already a gauge");
+    (() => r.distribution("buckets")).should.throw("buckets is already a Gauge");
   });
 
 //   it("can sub-divide by prefix", () => {

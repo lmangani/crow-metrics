@@ -1,5 +1,6 @@
 export { BiasedQuantileDistribution } from "./crow/bqdist";
 export { MetricName, MetricType } from "./crow/metric_name";
+export { Snapshot } from "./crow/snapshot";
 // import DeltaObserver from "./crow/delta";
 // import { exportInflux, InfluxObserver } from "./crow/influxdb";
 // import { prometheusExporter, PrometheusObserver } from "./crow/prometheus";
