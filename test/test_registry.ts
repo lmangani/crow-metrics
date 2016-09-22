@@ -163,128 +163,126 @@ describe("MetricsRegistry", () => {
     (() => r.distribution("buckets")).should.throw("buckets is already a Gauge");
   });
 
-//   it("can sub-divide by prefix", () => {
-//     const r = new MetricsRegistry();
-//     const r2 = r.withPrefix("myserver");
-//     r2.setGauge("gauge", 10);
-//     r2.counter("counter").increment(3);
-//     r2.distribution("dist", {}, [ 0.5 ]).add(100);
-//     const r3 = r2.withPrefix("moar");
-//     r3.counter("wut").increment(8);
-//
-//     Array.from(r.snapshot().flatten().keys()).sort().should.eql([
-//       "myserver_counter",
-//       "myserver_dist{p=0.5}",
-//       "myserver_dist{p=count}",
-//       "myserver_dist{p=sum}",
-//       "myserver_gauge",
-//       "myserver_moar_wut"
-//     ]);
-//
-//     const rr = new MetricsRegistry({ separator: "." });
-//     rr.withPrefix("prod").withPrefix("racetrack").counter("requests").increment();
-//     Array.from(rr.snapshot().flatten().keys()).sort().should.eql([
-//       "prod.racetrack.requests"
-//     ]);
-//   });
-//
-//   it("expires unused counters and distributions", done => {
-//     const snapshots = [];
-//     const r = new MetricsRegistry({ expire: 25 });
-//     r.addObserver(s => snapshots.push(s));
-//
-//     r.counter("old").increment(5);
-//     r.counter("new").increment(5);
-//     r.distribution("old2").add(1);
-//     r.distribution("new2").add(1);
-//     r._publish(Date.now());
-//     Array.from(snapshots[0].flatten(n => n).keys()).sort().should.eql([
-//       "new", "new2", "old", "old2"
-//     ]);
-//
-//     r._publish(Date.now() + 10);
-//     Array.from(snapshots[1].flatten(n => n).keys()).sort().should.eql([
-//       "new", "old"
-//     ]);
-//
-//     Promise.delay(25).then(() => {
-//       r.counter("new").increment(5);
-//       r.distribution("new2").add(1);
-//       r._publish(Date.now());
-//       Array.from(snapshots[2].flatten(n => n).keys()).sort().should.eql([
-//         "new", "new2"
-//       ]);
-//       done();
-//     });
-//   });
-//
-//   it("revivifies counters that expired but have live references", done => {
-//     const snapshots = [];
-//     const r = new MetricsRegistry({ expire: 25 });
-//     r.addObserver(s => snapshots.push(s));
-//
-//     const counter = r.counter("old");
-//     counter.reaped.should.eql(false);
-//
-//     counter.increment(5);
-//     r._publish(Date.now());
-//     Array.from(snapshots[0].flatten(n => n)).sort().should.eql([
-//       [ "old", { type: "counter", value: 5 } ]
-//     ]);
-//
-//     r._publish(Date.now() + 10);
-//
-//     Promise.delay(25).then(() => {
-//       r._publish(Date.now());
-//       Array.from(snapshots[2].flatten(n => n)).sort().should.eql([]);
-//
-//       counter.reaped.should.eql(true);
-//       (counter.forwarded == null).should.eql(true);
-//       counter.increment(3);
-//       counter.reaped.should.eql(true);
-//       counter.forwarded.reaped.should.eql(false);
-//
-//       r._publish(Date.now() + 10);
-//       Array.from(snapshots[3].flatten(n => n)).sort().should.eql([
-//         [ "old", { type: "counter", value: 3 } ]
-//       ]);
-//
-//       return Promise.delay(25);
-//     }).then(() => {
-//       r._publish(Date.now());
-//       Array.from(snapshots[4].flatten(n => n)).sort().should.eql([]);
-//
-//       counter.reaped.should.eql(true);
-//       counter.forwarded.reaped.should.eql(true);
-//       counter.increment(9);
-//       counter.reaped.should.eql(true);
-//       counter.forwarded.reaped.should.eql(false);
-//
-//       r._publish(Date.now() + 10);
-//       Array.from(snapshots[5].flatten(n => n)).sort().should.eql([
-//         [ "old", { type: "counter", value: 9 } ]
-//       ]);
-//
-//       done();
-//     });
-//   });
-//
-//   it("removes gauges", () => {
-//     const snapshots = [];
-//     const r = new MetricsRegistry({ expire: 25 });
-//     r.addObserver(s => snapshots.push(s));
-//
-//     r.setGauge("aura", () => 23);
-//     r.withPrefix("owl").setGauge("spirit", () => 17);
-//     r._publish(Date.now());
-//     Array.from(snapshots[0].flatten(n => n).keys()).sort().should.eql([ "aura", "owl_spirit" ]);
-//
-//     r._publish(Date.now());
-//     Array.from(snapshots[1].flatten(n => n).keys()).sort().should.eql([ "aura", "owl_spirit" ]);
-//
-//     r.removeGauge("aura");
-//     r.withPrefix("owl").removeGauge("spirit");
-//     r._publish(Date.now());
-//     Array.from(snapshots[2].flatten(n => n).keys()).sort().should.eql([ ]);
-//   });
+  it("can sub-divide by prefix", () => {
+    const r = new MetricsRegistry();
+    const r2 = r.withPrefix("myserver");
+    r2.setGauge(r2.gauge("gauge"), 10);
+    r2.increment(r2.counter("counter"), 3);
+    r2.addDistribution(r2.distribution("dist", {}, [ 0.5 ]), 100);
+    const r3 = r2.withPrefix("moar");
+    r3.increment(r3.counter("wut"), 8);
+
+    Array.from(r.snapshot().flatten().keys()).sort().should.eql([
+      "myserver_counter",
+      "myserver_dist{p=0.5}",
+      "myserver_dist{p=count}",
+      "myserver_dist{p=sum}",
+      "myserver_gauge",
+      "myserver_moar_wut"
+    ]);
+
+    const rr = new MetricsRegistry({ separator: "." });
+    const rr2 = rr.withPrefix("prod").withPrefix("racetrack");
+    rr.increment(rr2.counter("requests"));
+    Array.from(rr.snapshot().flatten().keys()).sort().should.eql([
+      "prod.racetrack.requests"
+    ]);
+  });
+
+  it("expires unused counters and distributions", () => {
+    const snapshots: Snapshot[] = [];
+    const r = new MetricsRegistry({ expire: 25 });
+    r.addObserver(s => snapshots.push(s));
+
+    r.increment(r.counter("old"), 5);
+    r.increment(r.counter("new"), 5);
+    r.addDistribution(r.distribution("old2"), 1);
+    r.addDistribution(r.distribution("new2"), 1);
+    r.publish(Date.now());
+    Array.from(snapshots[0].flatten(n => n.name).keys()).sort().should.eql([
+      "new", "new2", "old", "old2"
+    ]);
+
+    r.publish(Date.now() + 10);
+    Array.from(snapshots[1].flatten(n => n.name).keys()).sort().should.eql([
+      "new", "old"
+    ]);
+
+    return delay(25).then(() => {
+      r.increment(r.counter("new"), 5);
+      r.addDistribution(r.distribution("new2"), 1);
+      r.publish(Date.now());
+      Array.from(snapshots[2].flatten(n => n.name).keys()).sort().should.eql([
+        "new", "new2"
+      ]);
+    });
+  });
+
+  it("revivifies counters that expired but have live references", () => {
+    const snapshots: Snapshot[] = [];
+    const r = new MetricsRegistry({ expire: 25 });
+    r.addObserver(s => snapshots.push(s));
+
+    const counter = r.counter("old");
+    (r.metrics.get(counter.canonical) == null).should.eql(false);
+
+    r.increment(counter, 5);
+    r.publish(Date.now());
+    Array.from(snapshots[0].flatten(n => n.name)).sort().should.eql([
+      [ "old", 5 ]
+    ]);
+
+    r.publish(Date.now() + 10);
+
+    return delay(25).then(() => {
+      // no counter! it's gone!
+      r.publish(Date.now());
+      Array.from(snapshots[2].flatten(n => n.name)).sort().should.eql([]);
+      (r.metrics.get(counter.canonical) == null).should.eql(true);
+
+      r.increment(counter, 3);
+      (r.metrics.get(counter.canonical) == null).should.eql(false);
+
+      r.publish(Date.now() + 10);
+      Array.from(snapshots[3].flatten(n => n.name)).sort().should.eql([
+        [ "old", 3 ]
+      ]);
+
+      return delay(25);
+    }).then(() => {
+      r.publish(Date.now());
+      Array.from(snapshots[4].flatten(n => n.name)).sort().should.eql([]);
+      (r.metrics.get(counter.canonical) == null).should.eql(true);
+
+      r.increment(counter, 9);
+      (r.metrics.get(counter.canonical) == null).should.eql(false);
+
+      r.publish(Date.now() + 10);
+      Array.from(snapshots[5].flatten(n => n.name)).sort().should.eql([
+        [ "old", 9 ]
+      ]);
+    });
+  });
+
+  it("removes gauges from later snapshots", () => {
+    const snapshots: Snapshot[] = [];
+    const r = new MetricsRegistry({ expire: 25 });
+    r.addObserver(s => snapshots.push(s));
+
+    const aura = r.gauge("aura");
+    const spirit = r.withPrefix("owl").gauge("spirit");
+
+    r.setGauge(aura, () => 23);
+    r.setGauge(spirit, () => 17);
+    r.publish(Date.now());
+    Array.from(snapshots[0].flatten(n => n.name).keys()).sort().should.eql([ "aura", "owl_spirit" ]);
+
+    r.publish(Date.now());
+    Array.from(snapshots[1].flatten(n => n.name).keys()).sort().should.eql([ "aura", "owl_spirit" ]);
+
+    r.removeGauge(aura);
+    r.removeGauge(spirit);
+    r.publish(Date.now());
+    Array.from(snapshots[2].flatten(n => n.name).keys()).sort().should.eql([ ]);
+  });
 });

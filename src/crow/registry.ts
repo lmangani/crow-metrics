@@ -1,8 +1,6 @@
 import { Metric } from "./metrics/metric";
+import { Counter, Distribution, Gauge, Metrics } from "./metrics";
 // import DeltaObserver from "./delta";
-import { Distribution } from "./metrics/distribution";
-import { Counter } from "./metrics/counter";
-import { Gauge } from "./metrics/gauge";
 import { MetricName, MetricType, Tags } from "./metric_name";
 import { Snapshot } from "./snapshot";
 
@@ -60,7 +58,7 @@ export interface RegistryOptions {
  * options:
  *   - log: bunyan logger for debugging
  */
-export class MetricsRegistry {
+export class MetricsRegistry implements Metrics {
   // metrics are stored by their "fully-qualified" name, using stringified tags.
   metrics: Map<string, Metric> = new Map();
 
@@ -117,9 +115,10 @@ export class MetricsRegistry {
     setTimeout(() => this.publish(nextTime), duration);
   }
 
-  // timestamp is optional.
-  private publish(timestamp: number): void {
+  // timestamp is optional. exposed for testing.
+  publish(timestamp: number): void {
     if (!timestamp) timestamp = Date.now();
+    this.currentTime = timestamp;
     if (this.expire) {
       for (const [ key, metric ] of this.metrics) {
         if (metric.type == MetricType.Gauge) continue;
@@ -175,9 +174,6 @@ export class MetricsRegistry {
     return new Snapshot(this, timestamp, map);
   }
 
-  /*
-   * Find or create a counter with the given name and optional tags.
-   */
   counter(name: string, tags?: Tags): MetricName<Counter> {
     const maker = (x: MetricName<Counter>) => new Counter(x);
     const metricName = MetricName.create(MetricType.Counter, name, tags, this.baseMetric, maker);
@@ -185,37 +181,22 @@ export class MetricsRegistry {
     return metricName;
   }
 
-  /*
-   * Increment a counter. If the counter doesn't exist yet, it's created.
-   */
   increment(name: MetricName<Counter>, count: number = 1): void {
     const counter = this.getOrMake(name);
     counter.increment(count);
     counter.touch(this.currentTime);
   }
 
-  /*
-   * Find or create a gauge with the given name and optional tags.
-   */
   gauge(name: string, tags?: Tags): MetricName<Gauge> {
     const metricName = MetricName.create(MetricType.Gauge, name, tags, this.baseMetric, (x: MetricName<Gauge>) => new Gauge(x));
     this.getOrMake(metricName);
     return metricName;
   }
 
-  /*
-   * Add (or replace) a gauge with the given name.
-   * The getter is normally a function that computes the value on demand,
-   * but if the value changes rarely or never, you may use a constant value
-   * instead.
-   */
   setGauge(name: MetricName<Gauge>, getter: number | (() => number)) {
     this.getOrMake(name).set(getter);
   }
 
-  /*
-   * Remove a gauge.
-   */
   removeGauge(name: MetricName<Gauge>): void {
     const metric = this.metrics.get(name.canonical);
     if (metric === undefined) throw new Error("No such gauge: " + name.canonical);
@@ -225,9 +206,6 @@ export class MetricsRegistry {
     this.metrics.delete(name.canonical);
   }
 
-  /*
-   * Find or create a distribution with the given name and optional tags.
-   */
   distribution(
     name: string,
     tags: Tags = {},
@@ -246,10 +224,6 @@ export class MetricsRegistry {
     distribution.touch(this.currentTime);
   }
 
-  /*
-   * Time a function call (in milliseconds) and record it as a data point in
-   * a distribution. Exceptions are not recorded.
-   */
   time<T>(name: MetricName<Distribution>, f: () => T): T {
     const startTime = Date.now();
     const rv = f();
@@ -257,11 +231,6 @@ export class MetricsRegistry {
     return rv;
   }
 
-  /*
-   * Time a function call that returns a promise (in milliseconds) and
-   * record it as a data point in a distribution. Rejected promises are not
-   * recorded.
-   */
   timePromise<T>(name: MetricName<Distribution>, f: () => Promise<T>): Promise<T> {
     const startTime = Date.now();
     return f().then(rv => {
@@ -270,24 +239,24 @@ export class MetricsRegistry {
     });
   }
 
-//   /*
-//    * Return a new registry-like object that has accessors for metrics, but
-//    * prefixes all names with `(prefix)_`.
-//    */
-//   withPrefix(prefix) {
-//     return {
-//       counter: (name, tags) => this.counter(`${prefix}${this.separator}${name}`, tags),
-//       gauge: (name, tags) => this.gauge(`${prefix}${this.separator}${name}`, tags),
-//       setGauge: (name, tags, getter) => this.setGauge(`${prefix}${this.separator}${name}`, tags, getter),
-//       removeGauge: (name, tags) => this.removeGauge(`${prefix}${this.separator}${name}`, tags),
-//       distribution: (name, tags, percentiles, error) => {
-//         return this.distribution(`${prefix}${this.separator}${name}`, tags, percentiles, error);
-//       },
-//       withPrefix: (nextPrefix) => this.withPrefix(`${prefix}${this.separator}${nextPrefix}`),
-//       addObserver: (x) => this.addObserver(x),
-//       addDeltaObserver: (x, options = {}) => this.addDeltaObserver(x, options)
-//     };
-//   }
+  withPrefix(prefix: string): Metrics {
+    const _prefix = prefix + this.separator;
+    const self = this;
+    return {
+      counter(name: string, tags?: Tags) { return self.counter(_prefix + name, tags); },
+      gauge(name: string, tags?: Tags) { return self.gauge(_prefix + name, tags); },
+      distribution(name: string, tags?: Tags, percentiles?: number[], error?: number) {
+        return self.distribution(_prefix + name, tags, percentiles, error);
+      },
+      increment(name: MetricName<Counter>, count?: number) { self.increment(name, count); },
+      setGauge(name: MetricName<Gauge>, getter: number | (() => number)) { self.setGauge(name, getter); },
+      removeGauge(name: MetricName<Gauge>) { self.removeGauge(name); },
+      addDistribution(name: MetricName<Distribution>, data: number | number[]) { self.addDistribution(name, data); },
+      time<T>(name: MetricName<Distribution>, f: () => T) { return self.time(name, f); },
+      timePromise<T>(name: MetricName<Distribution>, f: () => Promise<T>) { return self.timePromise(name, f); },
+      withPrefix(prefix: string) { return self.withPrefix(_prefix + prefix); }
+    };
+  }
 
   private getOrMake<T extends Metric>(name: MetricName<T>): T {
     const metric = this.metrics.get(name.canonical);
