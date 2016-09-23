@@ -17,7 +17,8 @@
     "outDir": "lib/",
     "preserveConstEnums": true,
     "sourceMap": true,
-    "suppressImplicitAnyIndexErrors": true
+    "suppressImplicitAnyIndexErrors": true,
+    "strictNullChecks": true
   },
   "filesGlob": [
     "src/**/*.ts",

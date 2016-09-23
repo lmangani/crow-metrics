@@ -2,11 +2,11 @@ import { Metric } from "./metric";
 import { MetricName, MetricType } from "../metric_name";
 
 export class Gauge extends Metric {
-  constructor(name: MetricName<Gauge>, private getter?: number | (() => number)) {
+  constructor(name: MetricName<Gauge>, private getter: number | (() => number) = 0) {
     super(name, MetricType.Gauge);
   }
 
-  set(getter?: number | (() => number)) {
+  set(getter: number | (() => number)) {
     this.getter = getter;
   }
 

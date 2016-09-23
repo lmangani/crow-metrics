@@ -1,5 +1,5 @@
 import { Metric } from "./metrics/metric";
-import { Counter, Distribution, Gauge, Metrics } from "./metrics";
+import { Counter, Distribution, Gauge, Metrics, Observer } from "./metrics";
 // import DeltaObserver from "./delta";
 import { MetricName, MetricType, Tags } from "./metric_name";
 import { Snapshot } from "./snapshot";
@@ -8,8 +8,6 @@ declare var require: any;
 
 const DEFAULT_PERCENTILES = [ 0.5, 0.9, 0.99 ];
 const DEFAULT_ERROR = 0.01;
-
-export type Observer = (snapshot: Snapshot) => void;
 
 export interface BunyanLike {
   error(data: any, text: string): void;
@@ -67,11 +65,11 @@ export class MetricsRegistry implements Metrics {
   private percentiles: number[] = DEFAULT_PERCENTILES;
   private error: number = DEFAULT_ERROR;
 
-  private baseMetric?: MetricName<any> = null;
+  private baseMetric: MetricName<any> | null = null;
   private separator = "_";
   private currentTime = Date.now();
   private version = "?";
-  private log: BunyanLike = null;
+  private log: BunyanLike | null = null;
 
   private period = 60000;
   private expire = 0;
@@ -85,7 +83,7 @@ export class MetricsRegistry implements Metrics {
     if (options.error) this.error = options.error;
     if (options.log) this.log = options.log;
     if (options.tags) {
-      this.baseMetric = MetricName.create(MetricType.Gauge, "", options.tags);
+      this.baseMetric = MetricName.create(MetricType.Gauge, "", options.tags, null, null);
     }
     if (options.separator) this.separator = options.separator;
 
@@ -116,8 +114,8 @@ export class MetricsRegistry implements Metrics {
   }
 
   // timestamp is optional. exposed for testing.
-  publish(timestamp: number): void {
-    if (!timestamp) timestamp = Date.now();
+  publish(timestamp?: number): void {
+    if (timestamp == null) timestamp = Date.now();
     this.currentTime = timestamp;
     if (this.expire) {
       for (const [ key, metric ] of this.metrics) {
@@ -176,7 +174,7 @@ export class MetricsRegistry implements Metrics {
 
   counter(name: string, tags?: Tags): MetricName<Counter> {
     const maker = (x: MetricName<Counter>) => new Counter(x);
-    const metricName = MetricName.create(MetricType.Counter, name, tags, this.baseMetric, maker);
+    const metricName = MetricName.create(MetricType.Counter, name, tags || null, this.baseMetric, maker);
     this.getOrMake(metricName);
     return metricName;
   }
@@ -188,7 +186,7 @@ export class MetricsRegistry implements Metrics {
   }
 
   gauge(name: string, tags?: Tags): MetricName<Gauge> {
-    const metricName = MetricName.create(MetricType.Gauge, name, tags, this.baseMetric, (x: MetricName<Gauge>) => new Gauge(x));
+    const metricName = MetricName.create(MetricType.Gauge, name, tags || null, this.baseMetric, (x: MetricName<Gauge>) => new Gauge(x));
     this.getOrMake(metricName);
     return metricName;
   }
@@ -265,6 +263,7 @@ export class MetricsRegistry implements Metrics {
       return metric as T;
     }
 
+    if (name.maker == null) throw new Error("No maker assigned for metric");
     const newMetric = name.maker(name);
     this.metrics.set(name.canonical, newMetric);
     return newMetric;

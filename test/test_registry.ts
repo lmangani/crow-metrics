@@ -18,7 +18,7 @@ describe("MetricsRegistry", () => {
     r.increment(c);
     r.snapshot().toString().should.eql("Snapshot(buckets=6)");
     (r.metrics.get("buckets") as any).value.should.eql(6);
-    r.metrics.get("buckets").type.should.eql(MetricType.Counter);
+    (r.metrics.get("buckets") as any).type.should.eql(MetricType.Counter);
   });
 
   it("remembers gauges", () => {
@@ -83,9 +83,9 @@ describe("MetricsRegistry", () => {
     return r.timePromise(d, () => delay(50).then(() => 99)).then(rv => {
       rv.should.eql(99);
       const snapshot = r.snapshot().flatten();
-      snapshot.get("stars{p=count}").should.eql(2);
-      snapshot.get("stars{p=sum}").should.be.greaterThan(49);
-      snapshot.get("stars{p=0.5}").should.be.greaterThan(49);
+      (snapshot.get("stars{p=count}") as any).should.eql(2);
+      (snapshot.get("stars{p=sum}") as any).should.be.greaterThan(49);
+      (snapshot.get("stars{p=0.5}") as any).should.be.greaterThan(49);
     });
   });
 

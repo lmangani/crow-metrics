@@ -1,9 +1,12 @@
-import { MetricName, Tags } from "./metric_name";
+import { MetricName, MetricType, Tags } from "./metric_name";
 import { Counter } from "./metrics/counter";
 import { Distribution } from "./metrics/distribution";
 import { Gauge } from "./metrics/gauge";
+import { Snapshot } from "./snapshot";
 
 export { Counter, Distribution, Gauge };
+
+export type Observer = (snapshot: Snapshot) => void;
 
 /*
  * Basic interface for anything that wants to collect metrics.

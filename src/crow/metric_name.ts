@@ -26,8 +26,8 @@ export class MetricName<T> {
     public type: MetricType,
     public name: string,
     public tags: string[],
-    public parent: MetricName<any>,
-    public maker?: (name: MetricName<T>) => T
+    public parent: MetricName<any> | null,
+    public maker: ((name: MetricName<T>) => T) | null
   ) {
     this._canonical = this.format();
   }
@@ -94,18 +94,19 @@ export class MetricName<T> {
   }
 
   withType<U>(type: MetricType): MetricName<U> {
-    return new MetricName<U>(type, this.name, this.tags, this.parent);
+    return new MetricName<U>(type, this.name, this.tags, this.parent, null);
   }
 
   static create<T>(
     type: MetricType,
     name: string,
-    tags?: Tags,
-    parent?: MetricName<any>,
-    maker?: (name: MetricName<T>) => T
+    tags?: Tags | null,
+    parent?: MetricName<any> | null,
+    maker?: ((name: MetricName<T>) => T) | null
   ): MetricName<T> {
-    if (tags == null) return new MetricName(type, name, [], parent, maker);
-    return new MetricName(type, name, (tags instanceof Map) ? mapToList(tags) : objToList(tags), parent, maker);
+    if (tags == null) return new MetricName(type, name, [], parent || null, maker || null);
+    const realTags = (tags instanceof Map) ? mapToList(tags) : objToList(tags);
+    return new MetricName(type, name, realTags, parent || null, maker || null);
   }
 }
 

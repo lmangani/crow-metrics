@@ -27,7 +27,7 @@
     "mocha": "^3.0.2",
     "should": "^11.1.0",
     "source-map-support": "^0.4.2",
-    "typescript": "^2.0.0"
+    "typescript": "^2.0.3"
   },
   "engines": {
     "node": ">=4.2.0"
