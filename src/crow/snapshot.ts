@@ -29,6 +29,19 @@ export class Snapshot {
     return map;
   }
 
+  /*
+   * Like `flatten`, but emit a flat json object instead of a map.
+   */
+  toJson(
+    formatter: ((name: MetricName<Metric>) => string) = (name: MetricName<Metric>) => name.format()
+  ): { [key: string]: string } {
+    const rv = {};
+    for (const [ key, value ] of this.flatten(formatter).entries()) {
+      rv[key] = value;
+    }
+    return rv;
+  }
+
   // for debugging and tests
   toString() {
     const map = this.flatten();
