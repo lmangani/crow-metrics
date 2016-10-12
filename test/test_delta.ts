@@ -1,6 +1,6 @@
 "use strict";
 
-import { MetricsRegistry, DeltaObserver, Snapshot } from "../src";
+import { deltaSnapshots, MetricsRegistry, Snapshot } from "../src";
 
 import "should";
 import "source-map-support/register";
@@ -10,13 +10,11 @@ function delay(msec: number): Promise<any> {
   return new Promise(resolve => setTimeout(resolve, msec));
 }
 
-describe("DeltaObserver", () => {
+describe("deltaSnapshots", () => {
   it("passes through gauges and distributions unharmed", () => {
     const snapshots: Snapshot[] = [];
     const r = new MetricsRegistry();
-    const d = new DeltaObserver();
-    d.addObserver(s => snapshots.push(s));
-    r.addObserver(d.observer);
+    r.events.map(deltaSnapshots()).subscribe(s => snapshots.push(s));
 
     r.setGauge(r.gauge("speed"), 45);
     r.addDistribution(r.distribution("timings", { instance: "i-9999" }, [ 0.9 ]), 10);
@@ -33,9 +31,7 @@ describe("DeltaObserver", () => {
   it("computes deltas for counters", () => {
     const snapshots: Snapshot[] = [];
     const r = new MetricsRegistry();
-    const d = new DeltaObserver();
-    d.addObserver(s => snapshots.push(s));
-    r.addObserver(d.observer);
+    r.events.map(deltaSnapshots()).subscribe(s => snapshots.push(s));
 
     r.increment(r.counter("tickets"), 5);
     r.publish();
@@ -52,9 +48,7 @@ describe("DeltaObserver", () => {
   it("remembers old values across slow times", () => {
     const snapshots: Snapshot[] = [];
     const r = new MetricsRegistry();
-    const d = new DeltaObserver();
-    d.addObserver(s => snapshots.push(s));
-    r.addObserver(d.observer);
+    r.events.map(deltaSnapshots()).subscribe(s => snapshots.push(s));
 
     r.publish();
     r.increment(r.counter("cats"), 1);
@@ -76,9 +70,7 @@ describe("DeltaObserver", () => {
   it("forgets old values after expiration", () => {
     const snapshots: Snapshot[] = [];
     const r = new MetricsRegistry({ expire: 100 });
-    const d = new DeltaObserver();
-    d.addObserver(s => snapshots.push(s));
-    r.addObserver(d.observer);
+    r.events.map(deltaSnapshots()).subscribe(s => snapshots.push(s));
 
     r.increment(r.counter("cats"), 5);
     r.setGauge(r.gauge("speed"), () => 100);
@@ -99,7 +91,9 @@ describe("DeltaObserver", () => {
       snapshots.map(s => (s.flatten().get("cats"))).should.eql([ 5, 6, undefined, 2 ]);
     });
   });
-  //
+
+
+
   // it("will turn a counter into a distribution, by tag", () => {
   //   const snapshots = [];
   //   const r = new MetricsRegistry();

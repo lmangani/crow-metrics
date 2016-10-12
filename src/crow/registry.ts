@@ -1,8 +1,9 @@
 import { Metric } from "./metrics/metric";
-import { Counter, Distribution, Gauge, Metrics, Observer } from "./metrics";
+import { Counter, Distribution, Gauge, Metrics } from "./metrics";
 // import DeltaObserver from "./delta";
 import { MetricName, MetricType, Tags } from "./metric_name";
 import { Snapshot } from "./snapshot";
+import { EventSource } from "./source";
 
 declare var require: any;
 
@@ -60,10 +61,10 @@ export class MetricsRegistry implements Metrics {
   // metrics are stored by their "fully-qualified" name, using stringified tags.
   metrics: Map<string, Metric> = new Map();
 
-  private observers: Observer[] = [];
+  public events = new EventSource<Snapshot>();
 
-  private percentiles: number[] = DEFAULT_PERCENTILES;
-  private error: number = DEFAULT_ERROR;
+  public percentiles: number[] = DEFAULT_PERCENTILES;
+  public error: number = DEFAULT_ERROR;
 
   private baseMetric: MetricName<any> | null = null;
   private separator = "_";
@@ -71,13 +72,13 @@ export class MetricsRegistry implements Metrics {
   private version = "?";
   private log: BunyanLike | null = null;
 
-  private period = 60000;
+  private _period = 60000;
   private expire = 0;
   private periodRounding = 1;
   private lastPublish = Date.now();
 
   constructor(options: RegistryOptions = {}) {
-    if (options.period) this.period = options.period;
+    if (options.period) this._period = options.period;
     if (options.expire) this.expire = options.expire;
     if (options.percentiles) this.percentiles = options.percentiles;
     if (options.error) this.error = options.error;
@@ -106,6 +107,10 @@ export class MetricsRegistry implements Metrics {
     if (this.log) this.log.info(`crow-metrics ${this.version} started; period_sec=${this.period / 1000}`);
   }
 
+  get period(): number {
+    return this._period;
+  }
+
   private schedulePublish(): void {
     const nextTime = Math.round((this.lastPublish + this.period) / this.periodRounding) * this.periodRounding;
     let duration = nextTime - Date.now();
@@ -127,39 +132,12 @@ export class MetricsRegistry implements Metrics {
     const snapshot = this.snapshot(timestamp);
     this.lastPublish = snapshot.timestamp;
     if (this.log) {
-      this.log.trace(`Publishing ${this.metrics.size} metrics to ${this.observers.length} observers.`);
+      this.log.trace(`Publishing ${this.metrics.size} metrics to ${this.events.subscriberCount} observers.`);
     }
 
-    this.observers.forEach(observer => {
-      try {
-        observer(snapshot);
-      } catch (error) {
-        if (this.log) this.log.error({ err: error }, "Error in crow observer (skipping)");
-        // there may be no other way for someone to see there was an error:
-        console.log(error.stack);
-      }
-    });
-
+    this.events.emit(snapshot);
     this.schedulePublish();
   }
-
-  /*
-   * Add an observer, which receives a periodic snapshot of metrics.
-   * (See `Snapshot` for details.)
-   */
-  addObserver(observer: Observer): void {
-    this.observers.push(observer);
-  }
-
-//   /*
-//    * Add an observer, as with `addObserver`, but wrapped in a `DeltaObserver`
-//    * (convenience method).
-//    */
-//   addDeltaObserver(observer, options = {}) {
-//     const d = new DeltaObserver(options);
-//     d.addObserver(observer);
-//     this.addObserver(d.observer);
-//   }
 
   /*
    * Return a snapshot of the current value of each metric.
@@ -183,6 +161,10 @@ export class MetricsRegistry implements Metrics {
     const counter = this.getOrMake(name);
     counter.increment(count);
     counter.touch(this.currentTime);
+  }
+
+  getCounter(name: MetricName<Counter>): number {
+    return this.getOrMake(name).value;
   }
 
   gauge(name: string, tags?: Tags): MetricName<Gauge> {

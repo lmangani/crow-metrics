@@ -6,8 +6,6 @@ import { Snapshot } from "./snapshot";
 
 export { Counter, Distribution, Gauge };
 
-export type Observer = (snapshot: Snapshot) => void;
-
 /*
  * Basic interface for anything that wants to collect metrics.
  */

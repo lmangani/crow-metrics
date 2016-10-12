@@ -55,6 +55,12 @@ export class MetricName<T> {
     }
   }
 
+  get tagMap(): Map<string, string> {
+    const map = new Map<string, string>();
+    this.tagsToMap(map);
+    return map;
+  }
+
   // for use as string keys in the registry.
   get canonical(): string {
     return this._canonical;

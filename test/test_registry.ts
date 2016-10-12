@@ -143,7 +143,7 @@ describe("MetricsRegistry", () => {
   it("publishes to observers", () => {
     const captured: Snapshot[] = [];
     const r = new MetricsRegistry({ period: 10 });
-    r.addObserver(snapshot => captured.push(snapshot));
+    r.events.subscribe(snapshot => captured.push(snapshot));
     r.increment(r.counter("buckets"), 5);
     return delay(13).then(() => {
       r.increment(r.counter("buckets"), 3);
@@ -192,7 +192,7 @@ describe("MetricsRegistry", () => {
   it("expires unused counters and distributions", () => {
     const snapshots: Snapshot[] = [];
     const r = new MetricsRegistry({ expire: 25 });
-    r.addObserver(s => snapshots.push(s));
+    r.events.subscribe(s => snapshots.push(s));
 
     r.increment(r.counter("old"), 5);
     r.increment(r.counter("new"), 5);
@@ -221,7 +221,7 @@ describe("MetricsRegistry", () => {
   it("revivifies counters that expired but have live references", () => {
     const snapshots: Snapshot[] = [];
     const r = new MetricsRegistry({ expire: 25 });
-    r.addObserver(s => snapshots.push(s));
+    r.events.subscribe(s => snapshots.push(s));
 
     const counter = r.counter("old");
     (r.metrics.get(counter.canonical) == null).should.eql(false);
@@ -267,7 +267,7 @@ describe("MetricsRegistry", () => {
   it("removes gauges from later snapshots", () => {
     const snapshots: Snapshot[] = [];
     const r = new MetricsRegistry({ expire: 25 });
-    r.addObserver(s => snapshots.push(s));
+    r.events.subscribe(s => snapshots.push(s));
 
     const aura = r.gauge("aura");
     const spirit = r.withPrefix("owl").gauge("spirit");
