@@ -1,7 +1,7 @@
 {
   "name": "crow-metrics",
-  "version": "2.4.1",
-  "description": "small metrics collector for node",
+  "version": "3.0.0",
+  "description": "small metrics collector for node.js servers",
   "keywords": [
     "metrics",
     "prometheus",
@@ -10,11 +10,11 @@
   "author": "Robey Pointer <robeypointer@gmail.com>",
   "repository": {
     "type": "git",
-    "url": "git@github.com:robey/node-crow.git"
+    "url": "git@github.com:robey/crow-metrics.git"
   },
   "license": "Apache-2.0",
   "scripts": {
-    "build": "tsc -d --declarationDir lib/",
+    "build": "tsc",
     "clean": "rm -rf lib",
     "distclean": "npm run clean && rm -rf node_modules npm-debug.log",
     "prepublish": "npm run build",
@@ -25,6 +25,7 @@
   },
   "devDependencies": {
     "@types/mocha": "^2.2.32",
+    "@types/node": "^6.0.41",
     "@types/should": "^8.1.30",
     "mocha": "^3.0.2",
     "should": "^11.1.0",
@@ -34,10 +35,10 @@
   "engines": {
     "node": ">=4.2.0"
   },
-  "main": "./lib/src",
+  "main": "./lib/index.js",
+  "types": "./lib/index.d.ts",
   "files": [
     "doc",
-    "lib",
-    "static"
+    "lib"
   ]
 }

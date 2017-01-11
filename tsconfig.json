@@ -13,17 +13,17 @@
     "allowUnreachableCode": false,
     "removeComments": true,
     "noLib": false,
-    "rootDir": "./",
+    "rootDir": "src/",
     "outDir": "lib/",
+    "declaration": true,
+    "declarationDir": "lib/",
     "preserveConstEnums": true,
     "sourceMap": true,
     "suppressImplicitAnyIndexErrors": true,
     "strictNullChecks": true
   },
   "filesGlob": [
-    "src/**/*.ts",
-    "test/**/*.ts",
-    "node_modules/@types/**/*.ts"
+    "src/**/*.ts"
   ],
   "compileOnSave": true,
   "buildOnSave": false,

@@ -5,7 +5,7 @@ import { MetricsRegistry } from "./registry";
 /*
  * Snapshot of the values of every metric in the system at a given time.
  * The snapshot is exposed in raw form as `map`, a Map of metric objects to
- * values, where the value may be a `Number` or `Map(String -> Number)`.
+ * numeric values.
  */
 export class Snapshot {
   constructor(public registry: MetricsRegistry, public timestamp: number, public map: Map<MetricName<Metric>, number>) {
@@ -34,7 +34,7 @@ export class Snapshot {
    */
   toJson(
     formatter: ((name: MetricName<Metric>) => string) = (name: MetricName<Metric>) => name.format()
-  ): { [key: string]: string } {
+  ): { [key: string]: number } {
     const rv = {};
     for (const [ key, value ] of this.flatten(formatter).entries()) {
       rv[key] = value;
