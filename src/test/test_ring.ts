@@ -1,4 +1,4 @@
-import { deltaSnapshots, MetricsRegistry, RingBufferObserver } from "../src";
+import { deltaSnapshots, MetricsRegistry, RingBufferObserver } from "..";
 
 import "should";
 import "source-map-support/register";

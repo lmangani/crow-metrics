@@ -1,6 +1,6 @@
 "use strict";
 
-import { deltaSnapshots, MetricsRegistry, Snapshot } from "../src";
+import { deltaSnapshots, MetricsRegistry, Snapshot } from "..";
 
 import "should";
 import "source-map-support/register";

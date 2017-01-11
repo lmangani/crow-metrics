@@ -1,4 +1,4 @@
-import { BiasedQuantileDistribution } from "../src";
+import { BiasedQuantileDistribution } from "..";
 
 import "should";
 import "source-map-support/register";

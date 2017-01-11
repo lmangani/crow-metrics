@@ -1,4 +1,4 @@
-import { MetricsRegistry, MetricType, Snapshot } from "../src";
+import { MetricsRegistry, MetricType, Snapshot } from "..";
 
 import "should";
 import "source-map-support/register";

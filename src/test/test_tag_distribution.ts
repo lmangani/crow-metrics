@@ -1,6 +1,6 @@
 "use strict";
 
-import { tagDistribution, MetricsRegistry, Snapshot } from "../src";
+import { tagDistribution, MetricsRegistry, Snapshot } from "..";
 
 import "should";
 import "source-map-support/register";
