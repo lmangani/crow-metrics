@@ -229,6 +229,7 @@ export class MetricsRegistry implements Metrics {
         return self.distribution(_prefix + name, tags, percentiles, error);
       },
       increment(name: MetricName<Counter>, count?: number) { self.increment(name, count); },
+      getCounter(name: MetricName<Counter>) { return self.getCounter(name); },
       setGauge(name: MetricName<Gauge>, getter: number | (() => number)) { self.setGauge(name, getter); },
       removeGauge(name: MetricName<Gauge>) { self.removeGauge(name); },
       addDistribution(name: MetricName<Distribution>, data: number | number[]) { self.addDistribution(name, data); },

@@ -36,6 +36,12 @@ export interface Metrics {
   increment(name: MetricName<Counter>, count?: number): void;
 
   /*
+   * Get the current value of a counter. If the counter doesn't exist yet,
+   * it's created.
+   */
+  getCounter(name: MetricName<Counter>): number;
+
+  /*
    * Add (or replace) a gauge with the given name.
    * The getter is normally a function that computes the value on demand,
    * but if the value changes rarely or never, you may use a constant value
