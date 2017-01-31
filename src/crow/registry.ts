@@ -223,6 +223,7 @@ export class MetricsRegistry implements Metrics {
     const _prefix = prefix + this.separator;
     const self = this;
     return {
+      events: self.events,
       counter(name: string, tags?: Tags) { return self.counter(_prefix + name, tags); },
       gauge(name: string, tags?: Tags) { return self.gauge(_prefix + name, tags); },
       distribution(name: string, tags?: Tags, percentiles?: number[], error?: number) {

@@ -3,6 +3,7 @@ import { Counter } from "./metrics/counter";
 import { Distribution } from "./metrics/distribution";
 import { Gauge } from "./metrics/gauge";
 import { Snapshot } from "./snapshot";
+import { EventSource } from "./source";
 
 export { Counter, Distribution, Gauge };
 
@@ -10,6 +11,9 @@ export { Counter, Distribution, Gauge };
  * Basic interface for anything that wants to collect metrics.
  */
 export interface Metrics {
+  // reference back to the registry event stream
+  events: EventSource<Snapshot>;
+
   /*
    * Find or create a counter with the given name and optional tags.
    */
