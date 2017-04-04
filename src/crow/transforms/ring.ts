@@ -1,5 +1,5 @@
 // import DeltaObserver from "./delta";
-import { Observer } from "@reactivex/rxjs";
+import { Observer } from "rxjs";
 import { Snapshot } from "../snapshot";
 
 // one hour
@@ -13,15 +13,27 @@ export interface RingBufferObserverOptions {
  * Snapshot observer that preserves a buffer of snapshots for some amount of
  * time (by default, one hour). Can be combined with other transforms like
  * `deltaSnapshots`.
+ *
+ * Note: rxjs has a weird bug where, if this class implements Observer<T>,
+ * rxjs will clone it without copying any of the state, and send events to
+ * its lobotomized clone. So we attach an observer as an anonymous object
+ * that rxjs can mangle at will.
  */
-export class RingBufferObserver implements Observer<Snapshot> {
+export class RingBufferObserver {
   private span: number = DEFAULT_SPAN;
   private size: number = 0;
   private index: number = 0;
   private buffer: Snapshot[] = [];
 
+  observer: Observer<Snapshot>;
+
   constructor(options: RingBufferObserverOptions = {}) {
     if (options.span) this.span = options.span;
+    this.observer = {
+      next: (snapshot: Snapshot) => this.next(snapshot),
+      error: (error: Error) => null,
+      complete: () => null
+    };
   }
 
   next(snapshot: Snapshot): void {

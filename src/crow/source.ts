@@ -1,4 +1,4 @@
-import { Subscriber, Observable } from "@reactivex/rxjs";
+import { Subscriber, Observable } from "rxjs";
 
 /*
  * An event source has a set of subscribers, and emits events to all of them.
