@@ -8,7 +8,7 @@ import { MetricsRegistry } from "./registry";
  * numeric values.
  */
 export class Snapshot {
-  constructor(public registry: MetricsRegistry, public timestamp: number, public map: Map<MetricName<Metric>, number>) {
+  constructor(public registry: MetricsRegistry, public timestamp: number, public map: Map<MetricName, number>) {
     // pass.
   }
 
@@ -19,7 +19,7 @@ export class Snapshot {
    * `name{tag=value,tag=value}`.
    */
   flatten(
-    formatter: ((name: MetricName<Metric>) => string) = (name: MetricName<Metric>) => name.format()
+    formatter: ((name: MetricName) => string) = (name: MetricName) => name.format()
   ): Map<string, number> {
     const map = new Map();
     for (const [ metric, value ] of this.map) {
@@ -33,9 +33,9 @@ export class Snapshot {
    * Like `flatten`, but emit a flat json object instead of a map.
    */
   toJson(
-    formatter: ((name: MetricName<Metric>) => string) = (name: MetricName<Metric>) => name.format()
+    formatter: ((name: MetricName) => string) = (name: MetricName) => name.format()
   ): { [key: string]: number } {
-    const rv = {};
+    const rv: any = {};
     for (const [ key, value ] of this.flatten(formatter).entries()) {
       rv[key] = value;
     }

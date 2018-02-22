@@ -1,3 +1,5 @@
+import { Metric } from "./metrics/metric";
+
 // different metric types have different implementations:
 export enum MetricType {
   Counter,
@@ -18,7 +20,7 @@ export enum MetricType {
  * This class should be considered immutable. Modifications always return a
  * new object.
  */
-export class MetricName<T> {
+export class MetricName {
   private _canonical: string;
 
   // internally, tags are a single array of [ key, value, key, value, ...] to save space.
@@ -26,8 +28,8 @@ export class MetricName<T> {
     public type: MetricType,
     public name: string,
     public tags: string[],
-    public parent: MetricName<any> | null,
-    public maker: ((name: MetricName<T>) => T) | null
+    public parent?: MetricName,
+    public maker?: ((name: MetricName) => Metric<any>)
   ) {
     this._canonical = this.format();
   }
@@ -66,53 +68,53 @@ export class MetricName<T> {
     return this._canonical;
   }
 
-  private withExtraTags(tags: string[]): MetricName<T> {
-    return new MetricName<T>(this.type, this.name, tags, this, this.maker);
+  private withExtraTags(tags: string[]): MetricName {
+    return new MetricName(this.type, this.name, tags, this, this.maker);
   }
 
-  private withReplacedTags(tags: string[]): MetricName<T> {
-    return new MetricName<T>(this.type, this.name, tags, null, this.maker);
+  private withReplacedTags(tags: string[]): MetricName {
+    return new MetricName(this.type, this.name, tags, undefined, this.maker);
   }
 
   /*
    * Return a new MetricName which consists of these tags overlaid with any
    * tags passed in.
    */
-  addTags(other: Tags): MetricName<T> {
+  addTags(other: Tags): MetricName {
     return this.withExtraTags(other instanceof Map ? mapToList(other) : objToList(other));
   }
 
   /*
    * Return a new MetricName with the given tag added.
    */
-  addTag(key: string, value: string): MetricName<T> {
+  addTag(key: string, value: string): MetricName {
     return this.withExtraTags([ key, value ]);
   }
 
   /*
    * Return a new MetricName with the given tag(s) removed.
    */
-  removeTags(...keys: string[]): MetricName<T> {
+  removeTags(...keys: string[]): MetricName {
     const map = new Map<string, string>();
     this.tagsToMap(map);
     keys.forEach(key => map.delete(key));
     return this.withReplacedTags([].concat.apply([], Array.from(map.entries())));
   }
 
-  withType<U>(type: MetricType): MetricName<U> {
-    return new MetricName<U>(type, this.name, this.tags, this.parent, null);
+  withType(type: MetricType): MetricName {
+    return new MetricName(type, this.name, this.tags, this.parent, undefined);
   }
 
-  static create<T>(
+  static create(
     type: MetricType,
     name: string,
-    tags?: Tags | null,
-    parent?: MetricName<any> | null,
-    maker?: ((name: MetricName<T>) => T) | null
-  ): MetricName<T> {
-    if (tags == null) return new MetricName(type, name, [], parent || null, maker || null);
+    tags?: Tags,
+    parent?: MetricName,
+    maker?: ((name: MetricName) => Metric<any>)
+  ): MetricName {
+    if (tags == null) return new MetricName(type, name, [], parent, maker);
     const realTags = (tags instanceof Map) ? mapToList(tags) : objToList(tags);
-    return new MetricName(type, name, realTags, parent || null, maker || null);
+    return new MetricName(type, name, realTags, parent, maker);
   }
 }
 
@@ -120,11 +122,11 @@ export type Tags = Map<string, string> | { [key: string]: string };
 
 const NoTags = new Map<string, string>();
 
-function objToMap(obj: Object): Map<string, string> {
+function objToMap(obj: any): Map<string, string> {
   return new Map(Object.keys(obj).map(k => [ k, obj[k].toString() ] as [ string, string ]));
 }
 
-function objToList(obj: Object): string[] {
+function objToList(obj: any): string[] {
   return [].concat.apply([], Object.keys(obj).map(k => [ k, obj[k].toString() ]));
 }
 

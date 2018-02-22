@@ -8,7 +8,7 @@ import { Snapshot } from "../snapshot";
  */
 export interface MetricMatcher {
   // match returns true if this metric should be converted to a distribution.
-  match: string | RegExp | (<T>(name: MetricName<T>) => boolean);
+  match: string | RegExp | ((name: MetricName) => boolean);
 
   // which tags should be removed? (each unique tag combination is treated as a data point.)
   sortByTags: string[];
@@ -28,8 +28,8 @@ export interface MetricMatcher {
 
 class Matcher {
   constructor(
-    public filter: <T>(name: MetricName<T>) => boolean,
-    public getDistribution: <T>(name: MetricName<T>) => Distribution
+    public filter: (name: MetricName) => boolean,
+    public getDistribution: (name: MetricName) => Distribution
   ) {
     // pass.
   }
@@ -59,16 +59,16 @@ export function tagDistribution(registry: MetricsRegistry, ...metricMatchers: Me
   const matchers = metricMatchers.map(m => {
     const filter = (m.match instanceof Function) ? m.match :
       ((m.match instanceof RegExp) ?
-        <T>(x: MetricName<T>) => (m.match as RegExp).test(x.name) :
-        <T>(x: MetricName<T>) => m.match == x.name
+        (x: MetricName) => (m.match as RegExp).test(x.name) :
+        (x: MetricName) => m.match == x.name
       );
-    const getDistribution = <T>(x: MetricName<T>) => {
+    const getDistribution = <T>(x: MetricName) => {
       const tagMap = x.removeTags(...m.sortByTags).addTags(m.addTags || {}).tagMap;
       const name = registry.distribution(m.name || x.name, tagMap, m.percentiles, m.error);
       let d = newDistributions.get(name.canonical);
       if (d != null) return d;
       if (name.maker == null) throw new Error("assert");
-      d = name.maker(name);
+      d = name.maker(name) as Distribution;
       newDistributions.set(name.canonical, d);
       return d;
     }
@@ -76,7 +76,7 @@ export function tagDistribution(registry: MetricsRegistry, ...metricMatchers: Me
   });
 
   return (snapshot: Snapshot) => {
-    const map = new Map<MetricName<any>, number>();
+    const map = new Map<MetricName, number>();
 
     for (const [ metric, value ] of snapshot.map) {
       if (metric.type != MetricType.Distribution) {

@@ -27,10 +27,10 @@
     "@types/mocha": "^2.2.32",
     "@types/node": "^6.0.68",
     "@types/should": "^8.1.30",
-    "mocha": "^3.0.2",
-    "should": "^11.1.0",
-    "source-map-support": "^0.4.2",
-    "typescript": "^2.2.2"
+    "mocha": "^3.5.3",
+    "should": "^11.2.1",
+    "source-map-support": "^0.4.18",
+    "typescript": "^2.7.2"
   },
   "engines": {
     "node": ">=6.10.0"

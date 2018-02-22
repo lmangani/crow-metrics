@@ -16,7 +16,7 @@ export function deltaSnapshots() {
   const previous = new Map<string, number>();
 
   return (snapshot: Snapshot) => {
-    const map = new Map<MetricName<any>, number>();
+    const map = new Map<MetricName, number>();
     const newDistributions = new Set();
 
     for (const [ metric, value ] of snapshot.map) {

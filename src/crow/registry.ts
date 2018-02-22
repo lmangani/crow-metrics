@@ -59,14 +59,14 @@ export interface RegistryOptions {
  */
 export class MetricsRegistry implements Metrics {
   // metrics are stored by their "fully-qualified" name, using stringified tags.
-  metrics: Map<string, Metric> = new Map();
+  metrics: Map<string, Metric<any>> = new Map();
 
   public events = new EventSource<Snapshot>();
 
   public percentiles: number[] = DEFAULT_PERCENTILES;
   public error: number = DEFAULT_ERROR;
 
-  private baseMetric: MetricName<any> | null = null;
+  private baseMetric?: MetricName;
   private separator = "_";
   private currentTime = Date.now();
   private version = "?";
@@ -84,7 +84,7 @@ export class MetricsRegistry implements Metrics {
     if (options.error) this.error = options.error;
     if (options.log) this.log = options.log;
     if (options.tags) {
-      this.baseMetric = MetricName.create(MetricType.Gauge, "", options.tags, null, null);
+      this.baseMetric = MetricName.create(MetricType.Gauge, "", options.tags, undefined, undefined);
     }
     if (options.separator) this.separator = options.separator;
 
@@ -144,40 +144,41 @@ export class MetricsRegistry implements Metrics {
    * Distributions will be reset.
    */
   snapshot(timestamp: number = Date.now()) {
-    const map = new Map<MetricName<Metric>, number>();
+    const map = new Map<MetricName, number>();
     // some metrics (distributions, for example) will write multiple values into the snapshot.
     for (const metric of this.metrics.values()) metric.save(map);
     return new Snapshot(this, timestamp, map);
   }
 
-  counter(name: string, tags?: Tags): MetricName<Counter> {
-    const maker = (x: MetricName<Counter>) => new Counter(x);
-    const metricName = MetricName.create(MetricType.Counter, name, tags || null, this.baseMetric, maker);
-    this.getOrMake(metricName);
+  counter(name: string, tags?: Tags): MetricName {
+    const maker = (x: MetricName) => new Counter(x);
+    const metricName = MetricName.create(MetricType.Counter, name, tags, this.baseMetric, maker);
+    this.getOrMake<Counter>(MetricType.Counter, metricName);
     return metricName;
   }
 
-  increment(name: MetricName<Counter>, count: number = 1): void {
-    const counter = this.getOrMake(name);
+  increment(name: MetricName, count: number = 1): void {
+    const counter = this.getOrMake<Counter>(MetricType.Counter, name);
     counter.increment(count);
     counter.touch(this.currentTime);
   }
 
-  getCounter(name: MetricName<Counter>): number {
-    return this.getOrMake(name).value;
+  getCounter(name: MetricName): number {
+    return this.getOrMake<Counter>(MetricType.Counter, name).value;
   }
 
-  gauge(name: string, tags?: Tags): MetricName<Gauge> {
-    const metricName = MetricName.create(MetricType.Gauge, name, tags || null, this.baseMetric, (x: MetricName<Gauge>) => new Gauge(x));
-    this.getOrMake(metricName);
+  gauge(name: string, tags?: Tags): MetricName {
+    const maker = (x: MetricName) => new Gauge(x);
+    const metricName = MetricName.create(MetricType.Gauge, name, tags, this.baseMetric, maker);
+    this.getOrMake(MetricType.Gauge, metricName);
     return metricName;
   }
 
-  setGauge(name: MetricName<Gauge>, getter: number | (() => number)) {
-    this.getOrMake(name).set(getter);
+  setGauge(name: MetricName, getter: number | (() => number)) {
+    this.getOrMake<Gauge>(MetricType.Gauge, name).set(getter);
   }
 
-  removeGauge(name: MetricName<Gauge>): void {
+  removeGauge(name: MetricName): void {
     const metric = this.metrics.get(name.canonical);
     if (metric === undefined) throw new Error("No such gauge: " + name.canonical);
     if (metric.type != MetricType.Gauge) {
@@ -191,27 +192,27 @@ export class MetricsRegistry implements Metrics {
     tags: Tags = {},
     percentiles = this.percentiles,
     error = this.error
-  ): MetricName<Distribution> {
-    const maker = (x: MetricName<Distribution>) => new Distribution(x, percentiles, error);
+  ): MetricName {
+    const maker = (x: MetricName) => new Distribution(x, percentiles, error);
     const metricName = MetricName.create(MetricType.Distribution, name, tags, this.baseMetric, maker);
-    this.getOrMake(metricName);
+    this.getOrMake<Distribution>(MetricType.Distribution, metricName);
     return metricName;
   }
 
-  addDistribution(name: MetricName<Distribution>, data: number | number[]): void {
-    const distribution = this.getOrMake(name);
+  addDistribution(name: MetricName, data: number | number[]): void {
+    const distribution = this.getOrMake<Distribution>(MetricType.Distribution, name);
     distribution.add(data);
     distribution.touch(this.currentTime);
   }
 
-  time<T>(name: MetricName<Distribution>, f: () => T): T {
+  time<T>(name: MetricName, f: () => T): T {
     const startTime = Date.now();
     const rv = f();
     this.addDistribution(name, Date.now() - startTime);
     return rv;
   }
 
-  timePromise<T>(name: MetricName<Distribution>, f: () => Promise<T>): Promise<T> {
+  timePromise<T>(name: MetricName, f: () => Promise<T>): Promise<T> {
     const startTime = Date.now();
     return f().then(rv => {
       this.addDistribution(name, Date.now() - startTime);
@@ -229,18 +230,19 @@ export class MetricsRegistry implements Metrics {
       distribution(name: string, tags?: Tags, percentiles?: number[], error?: number) {
         return self.distribution(_prefix + name, tags, percentiles, error);
       },
-      increment(name: MetricName<Counter>, count?: number) { self.increment(name, count); },
-      getCounter(name: MetricName<Counter>) { return self.getCounter(name); },
-      setGauge(name: MetricName<Gauge>, getter: number | (() => number)) { self.setGauge(name, getter); },
-      removeGauge(name: MetricName<Gauge>) { self.removeGauge(name); },
-      addDistribution(name: MetricName<Distribution>, data: number | number[]) { self.addDistribution(name, data); },
-      time<T>(name: MetricName<Distribution>, f: () => T) { return self.time(name, f); },
-      timePromise<T>(name: MetricName<Distribution>, f: () => Promise<T>) { return self.timePromise(name, f); },
+      increment(name: MetricName, count?: number) { self.increment(name, count); },
+      getCounter(name: MetricName) { return self.getCounter(name); },
+      setGauge(name: MetricName, getter: number | (() => number)) { self.setGauge(name, getter); },
+      removeGauge(name: MetricName) { self.removeGauge(name); },
+      addDistribution(name: MetricName, data: number | number[]) { self.addDistribution(name, data); },
+      time<T>(name: MetricName, f: () => T) { return self.time(name, f); },
+      timePromise<T>(name: MetricName, f: () => Promise<T>) { return self.timePromise(name, f); },
       withPrefix(prefix: string) { return self.withPrefix(_prefix + prefix); }
     };
   }
 
-  private getOrMake<T extends Metric>(name: MetricName<T>): T {
+  private getOrMake<T extends Metric<T>>(type: MetricType, name: MetricName): T {
+    if (name.type != type) throw new Error(`Metric type mismatch: ${MetricType[type]} is not ${MetricType[name.type]}`);
     const metric = this.metrics.get(name.canonical);
     if (metric !== undefined) {
       if (metric.type != name.type) throw new Error(`${name.canonical} is already a ${MetricType[metric.type]}`);
@@ -248,7 +250,7 @@ export class MetricsRegistry implements Metrics {
     }
 
     if (name.maker == null) throw new Error("No maker assigned for metric");
-    const newMetric = name.maker(name);
+    const newMetric = name.maker(name) as T;
     this.metrics.set(name.canonical, newMetric);
     return newMetric;
   }

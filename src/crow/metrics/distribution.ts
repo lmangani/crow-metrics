@@ -7,17 +7,17 @@ import { MetricName, MetricType } from "../metric_name";
  * A distribution collects samples over a time period, and then summarizes
  * them based on percentiles requested (median, 90th percentile, and so on).
  */
-export class Distribution extends Metric {
+export class Distribution extends Metric<Distribution> {
   private distribution: BiasedQuantileDistribution;
-  private percentileGauges: MetricName<Gauge>[];
-  private countGauge: MetricName<Gauge>;
-  private sumGauge: MetricName<Gauge>;
+  private percentileGauges: MetricName[];
+  private countGauge: MetricName;
+  private sumGauge: MetricName;
 
-  constructor(name: MetricName<Distribution>, public percentiles: number[], public error: number) {
+  constructor(name: MetricName, public percentiles: number[], public error: number) {
     super(name, MetricType.Distribution);
     this.distribution = new BiasedQuantileDistribution(percentiles, error);
 
-    const baseGauge = name.withType<Gauge>(MetricType.Gauge);
+    const baseGauge = name.withType(MetricType.Gauge);
     this.percentileGauges = percentiles.map(p => baseGauge.addTag("p", p.toString()));
     this.countGauge = baseGauge.addTag("p", "count");
     this.sumGauge = baseGauge.addTag("p", "sum");
@@ -34,7 +34,7 @@ export class Distribution extends Metric {
     }
   }
 
-  save(snapshot: Map<MetricName<Metric>, number>): void {
+  save(snapshot: Map<MetricName, number>): void {
     const data = this.distribution.snapshot();
     this.distribution.reset();
     if (data.sampleCount == 0) return;
