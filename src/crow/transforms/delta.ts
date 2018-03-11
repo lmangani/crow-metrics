@@ -1,4 +1,5 @@
 import { MetricName, MetricType } from "../metric_name";
+import { Transform } from "../events";
 import { Snapshot } from "../snapshot";
 
 /*
@@ -9,9 +10,8 @@ import { Snapshot } from "../snapshot";
  * the `MetricsRegistry`:
  *
  *     registry.events.map(deltaSnapshots()).subscribe(snapshot => ...);
- *
  */
-export function deltaSnapshots() {
+export function deltaSnapshots(): Transform<Snapshot, Snapshot> {
   // previous values for counters
   const previous = new Map<string, number>();
 

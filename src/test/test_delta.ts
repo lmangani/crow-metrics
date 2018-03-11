@@ -1,5 +1,3 @@
-"use strict";
-
 import { deltaSnapshots, MetricsRegistry, Snapshot } from "..";
 
 import "should";
@@ -11,13 +9,23 @@ function delay(msec: number): Promise<any> {
 }
 
 describe("deltaSnapshots", () => {
+  let r: MetricsRegistry;
+
+  beforeEach(() => {
+    r = new MetricsRegistry();
+  });
+
+  afterEach(() => {
+    r.stop();
+  });
+
   it("passes through gauges and distributions unharmed", () => {
     const snapshots: Snapshot[] = [];
-    const r = new MetricsRegistry();
-    r.events.map(deltaSnapshots()).subscribe(s => snapshots.push(s));
+    r.events.map(deltaSnapshots()).forEach(s => snapshots.push(s));
+    const m = r.metrics;
 
-    r.setGauge(r.gauge("speed"), 45);
-    r.addDistribution(r.distribution("timings", { instance: "i-9999" }, [ 0.9 ]), 10);
+    m.setGauge(m.gauge("speed"), 45);
+    m.addDistribution(m.distribution("timings", { instance: "i-9999" }, [ 0.9 ]), 10);
     r.publish();
     snapshots.length.should.eql(1);
     Array.from(snapshots[0].flatten()).sort().should.eql([
@@ -30,12 +38,12 @@ describe("deltaSnapshots", () => {
 
   it("computes deltas for counters", () => {
     const snapshots: Snapshot[] = [];
-    const r = new MetricsRegistry();
-    r.events.map(deltaSnapshots()).subscribe(s => snapshots.push(s));
+    r.events.map(deltaSnapshots()).forEach(s => snapshots.push(s));
+    const m = r.metrics;
 
-    r.increment(r.counter("tickets"), 5);
+    m.increment(m.counter("tickets"), 5);
     r.publish();
-    r.increment(r.counter("tickets"), 1);
+    m.increment(m.counter("tickets"), 1);
     r.publish();
     r.publish();
 
@@ -47,19 +55,19 @@ describe("deltaSnapshots", () => {
 
   it("remembers old values across slow times", () => {
     const snapshots: Snapshot[] = [];
-    const r = new MetricsRegistry();
-    r.events.map(deltaSnapshots()).subscribe(s => snapshots.push(s));
+    r.events.map(deltaSnapshots()).forEach(s => snapshots.push(s));
+    const m = r.metrics;
 
     r.publish();
-    r.increment(r.counter("cats"), 1);
+    m.increment(m.counter("cats"), 1);
     r.publish();
-    r.increment(r.counter("cats"), 3);
+    m.increment(m.counter("cats"), 3);
     r.publish();
-    r.increment(r.counter("cats"), 2);
-    r.increment(r.counter("dogs"), 5);
+    m.increment(m.counter("cats"), 2);
+    m.increment(m.counter("dogs"), 5);
     r.publish();
     r.publish();
-    r.increment(r.counter("dogs"), 1);
+    m.increment(m.counter("dogs"), 1);
     r.publish();
 
     snapshots.length.should.eql(6);
@@ -67,84 +75,30 @@ describe("deltaSnapshots", () => {
     snapshots.map(s => (s.flatten().get("dogs"))).should.eql([ undefined, undefined, undefined, 5, 0, 1 ]);
   });
 
-  it("forgets old values after expiration", () => {
+  it("forgets old values after expiration", async () => {
     const snapshots: Snapshot[] = [];
-    const r = new MetricsRegistry({ expire: 100 });
-    r.events.map(deltaSnapshots()).subscribe(s => snapshots.push(s));
+    r.stop();
+    r = new MetricsRegistry({ expire: 100 });
+    r.events.map(deltaSnapshots()).forEach(s => snapshots.push(s));
+    const m = r.metrics;
 
-    r.increment(r.counter("cats"), 5);
-    r.setGauge(r.gauge("speed"), () => 100);
-    r.addDistribution(r.distribution("bugs"), 23);
+    m.increment(m.counter("cats"), 5);
+    m.setGauge(m.gauge("speed"), () => 100);
+    m.addDistribution(m.distribution("bugs"), 23);
     r.publish();
-    return delay(50).then(() => {
-      r.increment(r.counter("cats"), 6);
-      r.publish();
-      return delay(150);
-    }).then(() => {
-      r.publish();
-      return delay(50);
-    }).then(() => {
-      r.increment(r.counter("cats"), 2);
-      r.publish();
+    await delay(50);
 
-      snapshots.length.should.eql(4);
-      snapshots.map(s => (s.flatten().get("cats"))).should.eql([ 5, 6, undefined, 2 ]);
-    });
+    m.increment(m.counter("cats"), 6);
+    r.publish();
+    await delay(150);
+
+    r.publish();
+    await delay(50);
+
+    m.increment(m.counter("cats"), 2);
+    r.publish();
+
+    snapshots.length.should.eql(4);
+    snapshots.map(s => (s.flatten().get("cats"))).should.eql([ 5, 6, undefined, 2 ]);
   });
-
-
-
-  // it("will turn a counter into a distribution, by tag", () => {
-  //   const snapshots = [];
-  //   const r = new MetricsRegistry();
-  //   const d = new DeltaObserver({
-  //     rank: [
-  //       { name: "traffic_per_session", match: "bytes", tags: [ "session" ] }
-  //     ]
-  //   });
-  //   d.addObserver(s => snapshots.push(s));
-  //   r.addObserver(d.observer);
-  //
-  //   r.counter("bytes", { session: "3" }).increment(10);
-  //   r.counter("bytes", { session: "4" }).increment(20);
-  //   r.counter("bytes", { session: "5" }).increment(30);
-  //   r._publish();
-  //   Array.from(snapshots[0].flatten()).sort().should.eql([
-  //     [ "traffic_per_session{p=0.5}", { type: "distribution", value: 20 } ],
-  //     [ "traffic_per_session{p=0.99}", { type: "distribution", value: 30 } ],
-  //     [ "traffic_per_session{p=0.9}", { type: "distribution", value: 30 } ],
-  //     [ "traffic_per_session{p=count}", { type: "distribution", value: 3 } ],
-  //     [ "traffic_per_session{p=sum}", { type: "distribution", value: 60 } ]
-  //   ]);
-  // });
-  //
-  // it("will preserve other tags when constructing distributions", () => {
-  //   const snapshots = [];
-  //   const r = new MetricsRegistry();
-  //   const d = new DeltaObserver({
-  //     rank: [
-  //       { name: "traffic_per_session", match: "bytes", tags: [ "session" ] }
-  //     ]
-  //   });
-  //   d.addObserver(s => snapshots.push(s));
-  //   r.addObserver(d.observer);
-  //
-  //   r.counter("bytes", { type: "cat", session: "3" }).increment(10);
-  //   r.counter("bytes", { type: "mouse", session: "4" }).increment(20);
-  //   r.counter("bytes", { type: "mouse", session: "5" }).increment(29);
-  //   r.counter("bytes", { type: "mouse", session: "5" }).increment(1);
-  //   r._publish();
-  //   Array.from(snapshots[0].flatten()).sort().should.eql([
-  //     [ "traffic_per_session{p=0.5,type=cat}", { type: "distribution", value: 10 } ],
-  //     [ "traffic_per_session{p=0.5,type=mouse}", { type: "distribution", value: 30 } ],
-  //     [ "traffic_per_session{p=0.9,type=cat}", { type: "distribution", value: 10 } ],
-  //     [ "traffic_per_session{p=0.9,type=mouse}", { type: "distribution", value: 30 } ],
-  //     [ "traffic_per_session{p=0.99,type=cat}", { type: "distribution", value: 10 } ],
-  //     [ "traffic_per_session{p=0.99,type=mouse}", { type: "distribution", value: 30 } ],
-  //     [ "traffic_per_session{p=count,type=cat}", { type: "distribution", value: 1 } ],
-  //     [ "traffic_per_session{p=count,type=mouse}", { type: "distribution", value: 2 } ],
-  //     [ "traffic_per_session{p=sum,type=cat}", { type: "distribution", value: 10 } ],
-  //     [ "traffic_per_session{p=sum,type=mouse}", { type: "distribution", value: 50 } ]
-  //   ]);
-  // });
 });
