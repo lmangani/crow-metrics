@@ -1,11 +1,14 @@
-import { Metric } from "./metrics/metric";
-import { Counter, Distribution, Gauge, Metrics } from "./metrics";
-// import DeltaObserver from "./delta";
-import { MetricName, MetricType, Tags } from "./metric_name";
+import { EventSource } from "./events";
+import { Metric } from "./metric";
+import { Metrics } from "./metrics";
+import { Distribution, MetricName, MetricType, Tags } from "./metric_name";
 import { Snapshot } from "./snapshot";
-import { EventSource } from "./source";
 
-declare var require: any;
+// import { Counter, Distribution, Gauge, Metrics } from "./metrics";
+// // import DeltaObserver from "./delta";
+// import { MetricName, MetricType, Tags } from "./metric_name";
+//
+// declare var require: any;
 
 const DEFAULT_PERCENTILES = [ 0.5, 0.9, 0.99 ];
 const DEFAULT_ERROR = 0.01;
@@ -47,46 +50,35 @@ export interface RegistryOptions {
  *
  * Normally, you'd only create one of these, but it's perfectly valid to
  * create several and use them independently, if you want.
- *
- * Each metric object contains:
- *   - name
- *   - type (`this.constructor.name.toLowerCase()`)
- *   - tags
- *   - value: Number or Map(String -> Number)
- *
- * options:
- *   - log: bunyan logger for debugging
  */
-export class MetricsRegistry implements Metrics {
+export class MetricsRegistry {
   // metrics are stored by their "fully-qualified" name, using stringified tags.
-  metrics: Map<string, Metric<any>> = new Map();
+  private registry: Map<string, Metric> = new Map();
 
   public events = new EventSource<Snapshot>();
+  public metrics: Metrics;
 
   public percentiles: number[] = DEFAULT_PERCENTILES;
   public error: number = DEFAULT_ERROR;
 
-  private baseMetric?: MetricName;
-  private separator = "_";
-  private currentTime = Date.now();
-  private version = "?";
-  private log: BunyanLike | null = null;
+  separator = "_";
+  currentTime = Date.now();
+//   private version = "?";
 
-  private _period = 60000;
-  private expire = 0;
+  private period = 60000;
+//   private expire = 0;
   private periodRounding = 1;
   private lastPublish = Date.now();
 
-  constructor(options: RegistryOptions = {}) {
-    if (options.period) this._period = options.period;
-    if (options.expire) this.expire = options.expire;
-    if (options.percentiles) this.percentiles = options.percentiles;
-    if (options.error) this.error = options.error;
-    if (options.log) this.log = options.log;
-    if (options.tags) {
-      this.baseMetric = MetricName.create(MetricType.Gauge, "", options.tags, undefined, undefined);
-    }
-    if (options.separator) this.separator = options.separator;
+  private timer?: NodeJS.Timer;
+
+  constructor(public options: RegistryOptions = {}) {
+    this.metrics = new Metrics(this, "", options.tags);
+
+    if (options.separator !== undefined) this.separator = options.separator;
+    if (options.percentiles !== undefined) this.percentiles = options.percentiles;
+    if (options.error !== undefined) this.error = options.error;
+    if (options.period !== undefined) this.period = options.period;
 
     // if the period is a multiple of minute, 30 sec, 5 sec, or 1 sec, then
     // round the next publish time to that.
@@ -99,43 +91,44 @@ export class MetricsRegistry implements Metrics {
 
     this.schedulePublish();
 
-    try {
-      this.version = require("../../package.json").version;
-    } catch (error) {
-      // don't worry about it.
-    }
-    if (this.log) this.log.info(`crow-metrics ${this.version} started; period_sec=${this.period / 1000}`);
+//     try {
+//       this.version = require("../../package.json").version;
+//     } catch (error) {
+//       // don't worry about it.
+//     }
+//     if (this.log) this.log.info(`crow-metrics ${this.version} started; period_sec=${this.period / 1000}`);
   }
 
-  get period(): number {
-    return this._period;
+  stop() {
+    if (this.timer) clearTimeout(this.timer);
   }
 
   private schedulePublish(): void {
     const nextTime = Math.round((this.lastPublish + this.period) / this.periodRounding) * this.periodRounding;
     let duration = nextTime - Date.now();
     while (duration < 0) duration += this.period;
-    setTimeout(() => this.publish(nextTime), duration);
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = setTimeout(() => this.publish(nextTime), duration);
   }
 
   // timestamp is optional. exposed for testing.
   publish(timestamp?: number): void {
     if (timestamp == null) timestamp = Date.now();
     this.currentTime = timestamp;
-    if (this.expire) {
-      for (const [ key, metric ] of this.metrics) {
-        if (metric.type == MetricType.Gauge) continue;
-        if (metric.isExpired(timestamp, this.expire)) this.metrics.delete(key);
+    if (this.options.expire) {
+      for (const [ key, metric ] of this.registry) {
+        if (metric.name.type == MetricType.Gauge) continue;
+        if (metric.isExpired(timestamp, this.options.expire)) this.registry.delete(key);
       }
     }
 
     const snapshot = this.snapshot(timestamp);
     this.lastPublish = snapshot.timestamp;
-    if (this.log) {
-      this.log.trace(`Publishing ${this.metrics.size} metrics to ${this.events.subscriberCount} observers.`);
+    if (this.options.log) {
+      this.options.log.trace(`Publishing ${this.registry.size} metrics to ${this.events.subscriberCount} observers.`);
     }
 
-    this.events.emit(snapshot);
+    this.events.post(snapshot);
     this.schedulePublish();
   }
 
@@ -145,113 +138,50 @@ export class MetricsRegistry implements Metrics {
    */
   snapshot(timestamp: number = Date.now()) {
     const map = new Map<MetricName, number>();
-    // some metrics (distributions, for example) will write multiple values into the snapshot.
-    for (const metric of this.metrics.values()) metric.save(map);
+
+    for (const metric of this.registry.values()) {
+      switch (metric.name.type) {
+        case MetricType.Counter:
+        case MetricType.Gauge:
+          map.set(metric.name, metric.getValue());
+          break;
+        case MetricType.Distribution:
+          // distributions write multiple values into the snapshot:
+          const name = metric.name as Distribution;
+          const dist = metric.getDistribution();
+          const data = dist.snapshot();
+          dist.reset();
+          if (data.sampleCount > 0) {
+            for (let i = 0; i < name.percentiles.length; i++) {
+              map.set(name.percentileGauges[i], data.getPercentile(name.percentiles[i]));
+            }
+            map.set(name.countGauge, data.sampleCount);
+            map.set(name.sumGauge, data.sampleSum);
+          }
+          break;
+      }
+    }
+
     return new Snapshot(this, timestamp, map);
   }
 
-  counter(name: string, tags?: Tags): MetricName {
-    const maker = (x: MetricName) => new Counter(x);
-    const metricName = MetricName.create(MetricType.Counter, name, tags, this.baseMetric, maker);
-    this.getOrMake<Counter>(MetricType.Counter, metricName);
-    return metricName;
+  get(name: MetricName): Metric | undefined {
+    return this.registry.get(name.canonical);
   }
 
-  increment(name: MetricName, count: number = 1): void {
-    const counter = this.getOrMake<Counter>(MetricType.Counter, name);
-    counter.increment(count);
-    counter.touch(this.currentTime);
-  }
-
-  getCounter(name: MetricName): number {
-    return this.getOrMake<Counter>(MetricType.Counter, name).value;
-  }
-
-  gauge(name: string, tags?: Tags): MetricName {
-    const maker = (x: MetricName) => new Gauge(x);
-    const metricName = MetricName.create(MetricType.Gauge, name, tags, this.baseMetric, maker);
-    this.getOrMake(MetricType.Gauge, metricName);
-    return metricName;
-  }
-
-  setGauge(name: MetricName, getter: number | (() => number)) {
-    this.getOrMake<Gauge>(MetricType.Gauge, name).set(getter);
-  }
-
-  removeGauge(name: MetricName): void {
-    const metric = this.metrics.get(name.canonical);
-    if (metric === undefined) throw new Error("No such gauge: " + name.canonical);
-    if (metric.type != MetricType.Gauge) {
-      throw new Error(`${name.canonical} is a ${MetricType[metric.type]}, not a gauge`);
+  getOrMake(name: MetricName): Metric {
+    let metric = this.registry.get(name.canonical);
+    if (metric === undefined) {
+      metric = new Metric(name);
+      this.registry.set(name.canonical, metric);
     }
-    this.metrics.delete(name.canonical);
-  }
-
-  distribution(
-    name: string,
-    tags: Tags = {},
-    percentiles = this.percentiles,
-    error = this.error
-  ): MetricName {
-    const maker = (x: MetricName) => new Distribution(x, percentiles, error);
-    const metricName = MetricName.create(MetricType.Distribution, name, tags, this.baseMetric, maker);
-    this.getOrMake<Distribution>(MetricType.Distribution, metricName);
-    return metricName;
-  }
-
-  addDistribution(name: MetricName, data: number | number[]): void {
-    const distribution = this.getOrMake<Distribution>(MetricType.Distribution, name);
-    distribution.add(data);
-    distribution.touch(this.currentTime);
-  }
-
-  time<T>(name: MetricName, f: () => T): T {
-    const startTime = Date.now();
-    const rv = f();
-    this.addDistribution(name, Date.now() - startTime);
-    return rv;
-  }
-
-  timePromise<T>(name: MetricName, f: () => Promise<T>): Promise<T> {
-    const startTime = Date.now();
-    return f().then(rv => {
-      this.addDistribution(name, Date.now() - startTime);
-      return rv;
-    });
-  }
-
-  withPrefix(prefix: string): Metrics {
-    const _prefix = prefix + this.separator;
-    const self = this;
-    return {
-      events: self.events,
-      counter(name: string, tags?: Tags) { return self.counter(_prefix + name, tags); },
-      gauge(name: string, tags?: Tags) { return self.gauge(_prefix + name, tags); },
-      distribution(name: string, tags?: Tags, percentiles?: number[], error?: number) {
-        return self.distribution(_prefix + name, tags, percentiles, error);
-      },
-      increment(name: MetricName, count?: number) { self.increment(name, count); },
-      getCounter(name: MetricName) { return self.getCounter(name); },
-      setGauge(name: MetricName, getter: number | (() => number)) { self.setGauge(name, getter); },
-      removeGauge(name: MetricName) { self.removeGauge(name); },
-      addDistribution(name: MetricName, data: number | number[]) { self.addDistribution(name, data); },
-      time<T>(name: MetricName, f: () => T) { return self.time(name, f); },
-      timePromise<T>(name: MetricName, f: () => Promise<T>) { return self.timePromise(name, f); },
-      withPrefix(prefix: string) { return self.withPrefix(_prefix + prefix); }
-    };
-  }
-
-  private getOrMake<T extends Metric<T>>(type: MetricType, name: MetricName): T {
-    if (name.type != type) throw new Error(`Metric type mismatch: ${MetricType[type]} is not ${MetricType[name.type]}`);
-    const metric = this.metrics.get(name.canonical);
-    if (metric !== undefined) {
-      if (metric.type != name.type) throw new Error(`${name.canonical} is already a ${MetricType[metric.type]}`);
-      return metric as T;
+    if (metric.name.type != name.type) {
+      throw new Error(`${name.name} is already a ${MetricType[metric.name.type]}`);
     }
+    return metric;
+  }
 
-    if (name.maker == null) throw new Error("No maker assigned for metric");
-    const newMetric = name.maker(name) as T;
-    this.metrics.set(name.canonical, newMetric);
-    return newMetric;
+  remove(name: MetricName) {
+    this.registry.delete(name.canonical);
   }
 }

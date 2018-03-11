@@ -1,11 +1,13 @@
-import { Metric } from "./metrics/metric";
-
 // different metric types have different implementations:
 export enum MetricType {
   Counter,
   Gauge,
   Distribution
 }
+
+export type Tags = Map<string, string> | { [key: string]: string };
+
+export const NoTags = new Map<string, string>();
 
 /*
  * A metric name has a string name like "clientCount", and an optional list
@@ -19,117 +21,72 @@ export enum MetricType {
  *
  * This class should be considered immutable. Modifications always return a
  * new object.
+ *
+ * We assume metric names are created at startup time (for the server or for
+ * a session), so we do as much work as possible in the constructor.
  */
-export class MetricName {
-  private _canonical: string;
+export abstract class MetricName {
+  canonical: string;
 
-  // internally, tags are a single array of [ key, value, key, value, ...] to save space.
-  private constructor(
+  constructor(
     public type: MetricType,
     public name: string,
-    public tags: string[],
-    public parent?: MetricName,
-    public maker?: ((name: MetricName) => Metric<any>)
+    public tags: Map<string, string>,
   ) {
-    this._canonical = this.format();
+    this.canonical = this.format();
   }
 
   /*
    * Format into a string. The formatter converts each tag's key/value pair
    * into a string, and the joiner adds any separators or surrounders. The
-   * default formatters create the "canonical" version, using `=` to for tags
+   * default formatters create the "canonical" version, using `=` for tags
    * and surrounding them with `{...}`.
    */
   format(
-    formatter: ((key: string, value: string) => string) = (k, v) => k + "=" + v,
+    formatter: ((key: string, value: string) => string) = (k, v) => `${k}=${v}`,
     joiner: ((list: string[]) => string) = list => "{" + list.join(",") + "}"
   ): string {
-    if (this.tags.length == 0) return this.name;
-    const map = new Map<string, string>();
-    this.tagsToMap(map);
-    return this.name + joiner(Array.from(map.entries()).map(([ k, v ]) => formatter(k, v)).sort());
+    if (this.tags.size == 0) return this.name;
+    const keys = [...this.tags.keys()].sort();
+    return this.name + joiner(keys.map(k => formatter(k, this.tags.get(k) || "")));
   }
+}
 
-  private tagsToMap(map: Map<string, string>): void {
-    if (this.parent) this.parent.tagsToMap(map);
-    for (let i = 0; i < this.tags.length; i += 2) {
-      map.set(this.tags[i], this.tags[i + 1]);
-    }
+function tagsToMap(baseTags: Tags, tags: Tags = NoTags): Map<string, string> {
+  function toEntries(t: Tags): Iterable<[ string, string ]> {
+    return (t instanceof Map) ? t.entries() : Object.keys(t).map(k => [ k, t[k].toString() ] as [ string, string ]);
   }
+  return new Map([...toEntries(baseTags), ...toEntries(tags)]);
+}
 
-  get tagMap(): Map<string, string> {
-    const map = new Map<string, string>();
-    this.tagsToMap(map);
-    return map;
+
+export class Counter extends MetricName {
+  constructor(name: string, baseTags: Tags, tags: Tags) {
+    super(MetricType.Counter, name, tagsToMap(baseTags, tags));
   }
+}
 
-  // for use as string keys in the registry.
-  get canonical(): string {
-    return this._canonical;
+export class Gauge extends MetricName {
+  constructor(name: string, baseTags: Tags, tags: Tags) {
+    super(MetricType.Gauge, name, tagsToMap(baseTags, tags));
   }
+}
 
-  private withExtraTags(tags: string[]): MetricName {
-    return new MetricName(this.type, this.name, tags, this, this.maker);
-  }
+export class Distribution extends MetricName {
+  percentileGauges: Gauge[];
+  countGauge: Gauge;
+  sumGauge: Gauge;
 
-  private withReplacedTags(tags: string[]): MetricName {
-    return new MetricName(this.type, this.name, tags, undefined, this.maker);
-  }
-
-  /*
-   * Return a new MetricName which consists of these tags overlaid with any
-   * tags passed in.
-   */
-  addTags(other: Tags): MetricName {
-    return this.withExtraTags(other instanceof Map ? mapToList(other) : objToList(other));
-  }
-
-  /*
-   * Return a new MetricName with the given tag added.
-   */
-  addTag(key: string, value: string): MetricName {
-    return this.withExtraTags([ key, value ]);
-  }
-
-  /*
-   * Return a new MetricName with the given tag(s) removed.
-   */
-  removeTags(...keys: string[]): MetricName {
-    const map = new Map<string, string>();
-    this.tagsToMap(map);
-    keys.forEach(key => map.delete(key));
-    return this.withReplacedTags([].concat.apply([], Array.from(map.entries())));
-  }
-
-  withType(type: MetricType): MetricName {
-    return new MetricName(type, this.name, this.tags, this.parent, undefined);
-  }
-
-  static create(
-    type: MetricType,
+  constructor(
     name: string,
-    tags?: Tags,
-    parent?: MetricName,
-    maker?: ((name: MetricName) => Metric<any>)
-  ): MetricName {
-    if (tags == null) return new MetricName(type, name, [], parent, maker);
-    const realTags = (tags instanceof Map) ? mapToList(tags) : objToList(tags);
-    return new MetricName(type, name, realTags, parent, maker);
+    baseTags: Tags,
+    tags: Tags,
+    public percentiles: number[],
+    public error: number
+  ) {
+    super(MetricType.Distribution, name, tagsToMap(baseTags, tags));
+    this.percentileGauges = percentiles.map(p => new Gauge(this.name, this.tags, { p: p.toString() }));
+    this.countGauge = new Gauge(this.name, this.tags, { p: "count" });
+    this.sumGauge = new Gauge(this.name, this.tags, { p: "sum" });
   }
-}
-
-export type Tags = Map<string, string> | { [key: string]: string };
-
-const NoTags = new Map<string, string>();
-
-function objToMap(obj: any): Map<string, string> {
-  return new Map(Object.keys(obj).map(k => [ k, obj[k].toString() ] as [ string, string ]));
-}
-
-function objToList(obj: any): string[] {
-  return [].concat.apply([], Object.keys(obj).map(k => [ k, obj[k].toString() ]));
-}
-
-function mapToList(map: Map<string, string>): string[] {
-  return [].concat.apply([], Array.from(map.entries()));
 }

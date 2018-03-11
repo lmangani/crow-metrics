@@ -1,4 +1,4 @@
-import { Metric } from "./metrics/metric";
+import { Metric } from "./metric";
 import { MetricName } from "./metric_name";
 import { MetricsRegistry } from "./registry";
 
@@ -21,7 +21,7 @@ export class Snapshot {
   flatten(
     formatter: ((name: MetricName) => string) = (name: MetricName) => name.format()
   ): Map<string, number> {
-    const map = new Map();
+    const map = new Map<string, number>();
     for (const [ metric, value ] of this.map) {
       if (value == null || value === undefined) continue;
       map.set(formatter(metric), value);
