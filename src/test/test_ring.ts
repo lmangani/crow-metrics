@@ -92,34 +92,34 @@ describe("RingBufferObserver", () => {
     m.getCounter(m.counter("dogs")).should.eql(8);
   });
 
-//   it("rotates correctly", () => {
-//     const r = new MetricsRegistry();
-//     const rb = new RingBufferObserver({ span: r.period * 5 });
-//     r.events.map(deltaSnapshots()).subscribe(rb.observer);
-//     r.increment(r.counter("bugs"), 1);
-//     r.publish();
-//     r.increment(r.counter("bugs"), 2);
-//     r.publish();
-//     r.increment(r.counter("bugs"), 3);
-//     r.publish();
-//
-//     const flattened1 = rb.get().map(s => s.flatten());
-//     flattened1.map(s => s.get("bugs")).should.eql([ 1, 2, 3 ]);
-//
-//     r.increment(r.counter("bugs"), 4);
-//     r.publish();
-//     r.increment(r.counter("bugs"), 5);
-//     r.publish();
-//
-//     const flattened2 = rb.get().map(s => s.flatten());
-//     flattened2.map(s => s.get("bugs")).should.eql([ 1, 2, 3, 4, 5 ]);
-//
-//     r.increment(r.counter("bugs"), 6);
-//     r.publish();
-//     r.increment(r.counter("bugs"), 7);
-//     r.publish();
-//
-//     const flattened3 = rb.get().map(s => s.flatten());
-//     flattened3.map(s => s.get("bugs")).should.eql([ 3, 4, 5, 6, 7 ]);
-//   });
+  it("rotates correctly", () => {
+    const m = r.metrics;
+    const rb = new RingBuffer({ span: r.period * 5 });
+    r.events.map(deltaSnapshots()).forEach(rb.listener);
+    m.increment(m.counter("bugs"), 1);
+    r.publish();
+    m.increment(m.counter("bugs"), 2);
+    r.publish();
+    m.increment(m.counter("bugs"), 3);
+    r.publish();
+
+    const flattened1 = rb.get().map(s => s.flatten());
+    flattened1.map(s => s.get("bugs")).should.eql([ 1, 2, 3 ]);
+
+    m.increment(m.counter("bugs"), 4);
+    r.publish();
+    m.increment(m.counter("bugs"), 5);
+    r.publish();
+
+    const flattened2 = rb.get().map(s => s.flatten());
+    flattened2.map(s => s.get("bugs")).should.eql([ 1, 2, 3, 4, 5 ]);
+
+    m.increment(m.counter("bugs"), 6);
+    r.publish();
+    m.increment(m.counter("bugs"), 7);
+    r.publish();
+
+    const flattened3 = rb.get().map(s => s.flatten());
+    flattened3.map(s => s.get("bugs")).should.eql([ 3, 4, 5, 6, 7 ]);
+  });
 });
