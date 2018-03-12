@@ -52,4 +52,31 @@ export class Metric {
       throw new Error(`Metric type mismatch: treating ${MetricType[this.name.type]} as ${MetricType[type]}`);
     }
   }
+
+  /*
+   * store this metric's data into a Map. distributions will store multiple
+   * values: one for each requested percentile, and count and sum.
+   */
+  capture(map: Map<MetricName, number>) {
+    switch (this.name.type) {
+      case MetricType.Counter:
+      case MetricType.Gauge:
+        map.set(this.name, this.getValue());
+        break;
+      case MetricType.Distribution:
+        // distributions write multiple values into the snapshot:
+        const name = this.name as Distribution;
+        const dist = this.getDistribution();
+        const data = dist.snapshot();
+        dist.reset();
+        if (data.sampleCount > 0) {
+          for (let i = 0; i < name.percentiles.length; i++) {
+            map.set(name.percentileGauges[i], data.getPercentile(name.percentiles[i]));
+          }
+          map.set(name.countGauge, data.sampleCount);
+          map.set(name.sumGauge, data.sampleSum);
+        }
+        break;
+    }
+  }
 }

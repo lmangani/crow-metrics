@@ -11,15 +11,25 @@ function delay(msec: number): Promise<any> {
 }
 
 describe("tagDistribution", () => {
-  it("will turn a counter into a distribution, by tag", () => {
-    const snapshots: Snapshot[] = [];
-    const r = new MetricsRegistry();
-    const matcher = { name: "traffic_per_session", match: "bytes", sortByTags: [ "session" ] };
-    r.events.map(tagDistribution(r, matcher)).subscribe(s => snapshots.push(s));
+  let r: MetricsRegistry;
 
-    r.increment(r.counter("bytes", { session: "3" }), 10);
-    r.increment(r.counter("bytes", { session: "4" }), 20);
-    r.increment(r.counter("bytes", { session: "5" }), 30);
+  beforeEach(() => {
+    r = new MetricsRegistry();
+  });
+
+  afterEach(() => {
+    r.stop();
+  });
+
+  it("will turn a counter into a distribution, by tag", () => {
+    const m = r.metrics;
+    const snapshots: Snapshot[] = [];
+    const matcher = { name: "traffic_per_session", match: "bytes", sortByTags: [ "session" ] };
+    r.events.map(tagDistribution(m, matcher)).forEach(s => snapshots.push(s));
+
+    m.increment(m.counter("bytes", { session: "3" }), 10);
+    m.increment(m.counter("bytes", { session: "4" }), 20);
+    m.increment(m.counter("bytes", { session: "5" }), 30);
     r.publish();
     Array.from(snapshots[0].flatten()).sort().should.eql([
       [ "traffic_per_session{p=0.5}", 20 ],
@@ -31,15 +41,15 @@ describe("tagDistribution", () => {
   });
 
   it("will preserve other tags when constructing distributions", () => {
+    const m = r.metrics;
     const snapshots: Snapshot[] = [];
-    const r = new MetricsRegistry();
     const matcher = { name: "traffic_per_session", match: "bytes", sortByTags: [ "session" ] };
-    r.events.map(tagDistribution(r, matcher)).subscribe(s => snapshots.push(s));
+    r.events.map(tagDistribution(m, matcher)).forEach(s => snapshots.push(s));
 
-    r.increment(r.counter("bytes", { type: "cat", session: "3" }), 10);
-    r.increment(r.counter("bytes", { type: "mouse", session: "4" }), 20);
-    r.increment(r.counter("bytes", { type: "mouse", session: "5" }), 29);
-    r.increment(r.counter("bytes", { type: "mouse", session: "5" }), 1);
+    m.increment(m.counter("bytes", { type: "cat", session: "3" }), 10);
+    m.increment(m.counter("bytes", { type: "mouse", session: "4" }), 20);
+    m.increment(m.counter("bytes", { type: "mouse", session: "5" }), 29);
+    m.increment(m.counter("bytes", { type: "mouse", session: "5" }), 1);
     r.publish();
     Array.from(snapshots[0].flatten()).sort().should.eql([
       [ "traffic_per_session{p=0.5,type=cat}", 10 ],

@@ -1,5 +1,5 @@
-import { Distribution } from "../metrics/distribution";
-import { MetricName, MetricType, Tags } from "../metric_name";
+import { Distribution, MetricName, MetricType, Tags, tagsToMap } from "../metric_name";
+import { Metrics } from "../metrics";
 import { MetricsRegistry } from "../registry";
 import { Snapshot } from "../snapshot";
 
@@ -50,10 +50,9 @@ class Matcher {
  * This is a transform meant to be used in a `map` of snapshot events from
  * the `MetricsRegistry`:
  *
- *     registry.events.map(tagDistribution(registry, [ ... ])).subscribe(snapshot => ...);
- *
+ *     registry.events.map(tagDistribution(metrics, [ ... ])).forEach(snapshot => ...);
  */
-export function tagDistribution(registry: MetricsRegistry, ...metricMatchers: MetricMatcher[]) {
+export function tagDistribution(metrics: Metrics, ...metricMatchers: MetricMatcher[]) {
   const newDistributions = new Map<string, Distribution>();
 
   const matchers = metricMatchers.map(m => {
@@ -62,16 +61,15 @@ export function tagDistribution(registry: MetricsRegistry, ...metricMatchers: Me
         (x: MetricName) => (m.match as RegExp).test(x.name) :
         (x: MetricName) => m.match == x.name
       );
-    const getDistribution = <T>(x: MetricName) => {
-      const tagMap = x.removeTags(...m.sortByTags).addTags(m.addTags || {}).tagMap;
-      const name = registry.distribution(m.name || x.name, tagMap, m.percentiles, m.error);
-      let d = newDistributions.get(name.canonical);
-      if (d != null) return d;
-      if (name.maker == null) throw new Error("assert");
-      d = name.maker(name) as Distribution;
-      newDistributions.set(name.canonical, d);
-      return d;
-    }
+    const getDistribution = (x: MetricName) => {
+      const tags = new Map(x.tags);
+      m.sortByTags.forEach(k => tags.delete(k));
+      const name = metrics.distribution(m.name || x.name, tagsToMap(tags, m.addTags), m.percentiles, m.error);
+      const existing = newDistributions.get(name.canonical);
+      if (existing) return existing;
+      newDistributions.set(name.canonical, name);
+      return name;
+    };
     return new Matcher(filter, getDistribution);
   });
 
@@ -82,7 +80,7 @@ export function tagDistribution(registry: MetricsRegistry, ...metricMatchers: Me
       if (metric.type != MetricType.Distribution) {
         const matcher = matchers.filter(m => m.filter(metric))[0];
         if (matcher) {
-          matcher.getDistribution(metric).add(value);
+          metrics.addDistribution(matcher.getDistribution(metric), value);
         } else {
           map.set(metric, value);
         }
@@ -92,8 +90,11 @@ export function tagDistribution(registry: MetricsRegistry, ...metricMatchers: Me
     }
 
     // add any new distributions we computed.
-    for (const d of newDistributions.values()) d.save(map);
-
+    for (const d of newDistributions.values()) {
+      const metric = metrics.registry.get(d);
+      if (metric) metric.capture(map);
+    }
+    
     return new Snapshot(snapshot.registry, snapshot.timestamp, map);
   };
 }

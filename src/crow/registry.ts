@@ -139,30 +139,9 @@ export class MetricsRegistry {
    */
   snapshot(timestamp: number = Date.now()) {
     const map = new Map<MetricName, number>();
-
     for (const metric of this.registry.values()) {
-      switch (metric.name.type) {
-        case MetricType.Counter:
-        case MetricType.Gauge:
-          map.set(metric.name, metric.getValue());
-          break;
-        case MetricType.Distribution:
-          // distributions write multiple values into the snapshot:
-          const name = metric.name as Distribution;
-          const dist = metric.getDistribution();
-          const data = dist.snapshot();
-          dist.reset();
-          if (data.sampleCount > 0) {
-            for (let i = 0; i < name.percentiles.length; i++) {
-              map.set(name.percentileGauges[i], data.getPercentile(name.percentiles[i]));
-            }
-            map.set(name.countGauge, data.sampleCount);
-            map.set(name.sumGauge, data.sampleSum);
-          }
-          break;
-      }
+      metric.capture(map);
     }
-
     return new Snapshot(this, timestamp, map);
   }
 

@@ -52,7 +52,7 @@ export abstract class MetricName {
   }
 }
 
-function tagsToMap(baseTags: Tags, tags: Tags = NoTags): Map<string, string> {
+export function tagsToMap(baseTags: Tags, tags: Tags = NoTags): Map<string, string> {
   function toEntries(t: Tags): Iterable<[ string, string ]> {
     return (t instanceof Map) ? t.entries() : Object.keys(t).map(k => [ k, t[k].toString() ] as [ string, string ]);
   }
