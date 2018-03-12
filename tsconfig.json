@@ -1,6 +1,6 @@
 {
   "compilerOptions": {
-    "target": "es6",
+    "target": "es2017",
     "module": "commonjs",
     "strict": true,
     "sourceMap": true,
@@ -9,7 +9,6 @@
     "rootDir": "src/",
     "outDir": "lib/",
     "declaration": true,
-    "declarationDir": "lib/",
-    "skipLibCheck": true
+    "declarationDir": "lib/"
   },
 }

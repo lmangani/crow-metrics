@@ -87,3 +87,10 @@ Apache 2 (open-source) license, included in `LICENSE.txt`.
 ## Authors
 
 @robey - Robey Pointer <robeypointer@gmail.com>
+
+
+
+
+## FIXME
+
+- mention node 8 requirement for async/await and perf timings

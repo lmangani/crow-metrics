@@ -53,24 +53,23 @@ export interface RegistryOptions {
  */
 export class MetricsRegistry {
   // metrics are stored by their "fully-qualified" name, using stringified tags.
-  private registry: Map<string, Metric> = new Map();
+  registry: Map<string, Metric> = new Map();
 
-  public events = new EventSource<Snapshot>();
-  public metrics: Metrics;
+  events = new EventSource<Snapshot>();
+  metrics: Metrics;
 
-  public percentiles: number[] = DEFAULT_PERCENTILES;
-  public error: number = DEFAULT_ERROR;
+  percentiles: number[] = DEFAULT_PERCENTILES;
+  error: number = DEFAULT_ERROR;
 
   separator = "_";
   currentTime = Date.now();
-//   private version = "?";
+  version = "?";
 
-  private period = 60000;
-//   private expire = 0;
-  private periodRounding = 1;
-  private lastPublish = Date.now();
+  period = 60000;
+  periodRounding = 1;
+  lastPublish = Date.now();
 
-  private timer?: NodeJS.Timer;
+  timer?: NodeJS.Timer;
 
   constructor(public options: RegistryOptions = {}) {
     this.metrics = new Metrics(this, "", options.tags);
@@ -91,12 +90,14 @@ export class MetricsRegistry {
 
     this.schedulePublish();
 
-//     try {
-//       this.version = require("../../package.json").version;
-//     } catch (error) {
-//       // don't worry about it.
-//     }
-//     if (this.log) this.log.info(`crow-metrics ${this.version} started; period_sec=${this.period / 1000}`);
+    try {
+      this.version = require("../../package.json").version;
+    } catch (error) {
+      // don't worry about it.
+    }
+    if (this.options.log) {
+      this.options.log.info(`crow-metrics ${this.version} started; period_sec=${this.period / 1000}`);
+    }
   }
 
   stop() {
