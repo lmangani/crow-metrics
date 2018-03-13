@@ -14,17 +14,14 @@ export interface RingBufferOptions {
  * time (by default, one hour). Can be combined with other transforms like
  * `deltaSnapshots`.
  */
-export class RingBuffer {
+export class RingBuffer implements Listener<Snapshot> {
   private span: number = DEFAULT_SPAN;
   private size: number = 0;
   private index: number = 0;
   private buffer: Snapshot[] = [];
 
-  listener: Listener<Snapshot>;
-
   constructor(options: RingBufferOptions = {}) {
     if (options.span) this.span = options.span;
-    this.listener = (snapshot: Snapshot) => this.post(snapshot);
   }
 
   post(snapshot: Snapshot): void {

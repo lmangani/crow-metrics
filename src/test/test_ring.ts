@@ -18,7 +18,7 @@ describe("RingBufferObserver", () => {
   it("tracks gauges", () => {
     const m = r.metrics;
     const rb = new RingBuffer();
-    r.events.map(deltaSnapshots()).forEach(rb.listener);
+    r.events.map(deltaSnapshots()).attach(rb);
     m.setGauge(m.gauge("speed"), 45);
     r.publish();
     m.setGauge(m.gauge("speed"), 55);
@@ -32,7 +32,7 @@ describe("RingBufferObserver", () => {
   it("tracks counters", () => {
     const m = r.metrics;
     const rb = new RingBuffer();
-    r.events.map(deltaSnapshots()).forEach(rb.listener);
+    r.events.map(deltaSnapshots()).attach(rb);
     m.increment(m.counter("bruises"));
     r.publish();
     m.increment(m.counter("bruises"));
@@ -52,7 +52,7 @@ describe("RingBufferObserver", () => {
   it("tracks distributions", () => {
     const m = r.metrics;
     const rb = new RingBuffer();
-    r.events.map(deltaSnapshots()).forEach(rb.listener);
+    r.events.map(deltaSnapshots()).attach(rb);
     const d = m.distribution("timings", {}, [ 0.5, 0.9 ]);
     m.addDistribution(d, 2);
     m.addDistribution(d, 5);
@@ -74,7 +74,7 @@ describe("RingBufferObserver", () => {
   it("reports missing metrics", () => {
     const m = r.metrics;
     const rb = new RingBuffer();
-    r.events.map(deltaSnapshots()).forEach(rb.listener);
+    r.events.map(deltaSnapshots()).attach(rb);
     m.increment(m.counter("cats"), 3);
     r.publish();
     m.increment(m.counter("cats"), 2);
@@ -95,7 +95,7 @@ describe("RingBufferObserver", () => {
   it("rotates correctly", () => {
     const m = r.metrics;
     const rb = new RingBuffer({ span: r.period * 5 });
-    r.events.map(deltaSnapshots()).forEach(rb.listener);
+    r.events.map(deltaSnapshots()).attach(rb);
     m.increment(m.counter("bugs"), 1);
     r.publish();
     m.increment(m.counter("bugs"), 2);

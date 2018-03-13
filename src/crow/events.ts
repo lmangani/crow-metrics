@@ -1,6 +1,9 @@
-export type Listener<A> = (item: A) => void;
 export type Transform<A, B> = (item: A) => B;
 export type Filter<A> = (item: A) => boolean;
+
+export interface Listener<A> {
+  post(item: A): void;
+}
 
 /*
  * An event source has a set of subscribers, and emits events to all of them.
@@ -11,12 +14,16 @@ export class EventSource<A> {
   post(event: A) {
     if (this.listeners.size == 0) return;
     for (const listener of this.listeners) {
-      listener(event);
+      listener.post(event);
     }
   }
 
-  forEach(listener: Listener<A>) {
+  attach(listener: Listener<A>) {
     this.listeners.add(listener);
+  }
+
+  forEach(listener: (item: A) => void) {
+    this.attach({ post(item) { listener(item) } });
   }
 
   remove(listener: Listener<A>) {
