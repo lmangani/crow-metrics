@@ -9,7 +9,7 @@ import { Snapshot } from "../snapshot";
  * This is a transform meant to be used in a `map` of snapshot events from
  * the `MetricsRegistry`:
  *
- *     registry.events.map(deltaSnapshots()).subscribe(snapshot => ...);
+ *     registry.events.map(deltaSnapshots()).forEach(snapshot => ...);
  */
 export function deltaSnapshots(): Transform<Snapshot, Snapshot> {
   // previous values for counters
