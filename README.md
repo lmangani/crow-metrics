@@ -21,7 +21,7 @@ The goal of crow is to make it *dead simple* to collect and report these metrics
 
 ## Example
 
-Here's a quick example of a web service that counts requests and response times, and publishes them in a format [InfluxDB](http://influxdb.com/) can poll:
+Here's a quick example of a web service that counts requests and response times, and publishes them to an [InfluxDB](http://influxdb.com/) server:
 
 ```javascript
 const crow = require("crow-metrics");
@@ -30,22 +30,25 @@ const request = require("request");
 const webService = express();
 
 // one registry to rule them all, publishing once a minute.
-const metrics = new crow.MetricsRegistry({ period: 60000 });
+const metrics = crow.Metrics.create({ period: 60000 });
 
 // publish metrics to InfluxDB.
-crow.exportInflux(metrics, request, { hostname: "influxdb.prod.example.com", database: "prod" });
+crow.exportInfluxDb(metrics.events, { hostname: "influxdb.prod.example.com:8086", database: "prod" });
 
 // track heap-used as a gauge.
 // the function will be called on-demand, once a minute.
-metrics.setGauge("heap_used", function () { return process.memoryUsage().heapUsed; });
+const heapUsed = metrics.gauge("heap_used");
+metrics.setGauge(heapUsed, function () { return process.memoryUsage().heapUsed; });
 
 // my website.
+const requestCount = metrics.counter("request_count");
+const requestTime = metrics.distribution("request_time_msec");
 webService.get("/", function (request, response) {
   // count incoming requests:
-  metrics.counter("request_count").increment();
+  metrics.increment(requestCount);
 
   // time how long it takes to respond:
-  metrics.distribution("request_time_msec").time(function () {
+  metrics.time(requestTime, function () {
     response.send("Hello!\n");
   });
 });
@@ -60,7 +63,7 @@ Metrics consist of:
   - **gauges**: dials that measure a changing state, like the number of currently open connections, or the amount of memory being used.
   - **distributions**: samples that are interesting for their histogram, like timings (95th percentile of database reads, for example).
 
-Metrics are collected in a `MetricsRegistry` (usually you create only one). On a configurable period, these metrics are summarized and sent to observers. The observers can push the summary to a push-based service like Graphite, or post the results to a web service for a poll-based service like Prometheus.
+Metrics are collected in a `Registry` (usually there is only one). On a configurable period, these metrics are summarized and sent to listeners. The listeners can push the summary to a push-based service like Graphite, or post the results to a web service for a poll-based service like Prometheus.
 
 Each metric has a name, which is a string. Crow doesn't care what's in the string, but if you're sending metrics to a service, most of them have a naming convention. In general, you should use a name that could be an identifier (starts with a letter, contains only letters, digits, and underscore). Some metrics services use dot to build folder-like namespaces. Typical metric names are:
 
