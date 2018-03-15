@@ -11,4 +11,4 @@ export { RingBuffer, RingBufferOptions } from "./crow/transforms/ring";
 export { tagDistribution } from "./crow/transforms/tag_distribution";
 
 export { exportInfluxDb } from "./crow/exporters/influxdb";
-// import { prometheusExporter, PrometheusObserver } from "./crow/prometheus";
+export { exportPrometheus } from "./crow/exporters/prometheus";

@@ -32,6 +32,8 @@ export abstract class MetricName {
     public type: MetricType,
     public name: string,
     public tags: Map<string, string>,
+    // is this a manufactured gauge based on a distribution?
+    public computedFrom?: MetricName
   ) {
     this.canonical = this.format();
   }
@@ -67,8 +69,8 @@ export class Counter extends MetricName {
 }
 
 export class Gauge extends MetricName {
-  constructor(name: string, baseTags: Tags, tags: Tags) {
-    super(MetricType.Gauge, name, tagsToMap(baseTags, tags));
+  constructor(name: string, baseTags: Tags, tags: Tags, computedFrom?: MetricName) {
+    super(MetricType.Gauge, name, tagsToMap(baseTags, tags), computedFrom);
   }
 }
 
@@ -85,8 +87,8 @@ export class Distribution extends MetricName {
     public error: number
   ) {
     super(MetricType.Distribution, name, tagsToMap(baseTags, tags));
-    this.percentileGauges = percentiles.map(p => new Gauge(this.name, this.tags, { p: p.toString() }));
-    this.countGauge = new Gauge(this.name, this.tags, { p: "count" });
-    this.sumGauge = new Gauge(this.name, this.tags, { p: "sum" });
+    this.percentileGauges = percentiles.map(p => new Gauge(this.name, this.tags, { p: p.toString() }, this));
+    this.countGauge = new Gauge(this.name, this.tags, { p: "count" }, this);
+    this.sumGauge = new Gauge(this.name, this.tags, { p: "sum" }, this);
   }
 }
