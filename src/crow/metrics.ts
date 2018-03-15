@@ -1,17 +1,31 @@
+import { EventSource } from "./events";
 import { Counter, Distribution, Gauge, MetricType, NoTags, Tags } from "./metric_name";
-import { MetricsRegistry } from "./registry";
+import { Registry, RegistryOptions } from "./registry";
+import { Snapshot } from "./snapshot";
 import { performance } from "perf_hooks";
 
 /*
- * a prefix and base tags, for generating metric names.
+ * Primary entry point for crow: Create counters, gauges, and distributions,
+ * and manipulate them.
  */
 export class Metrics {
+  events: EventSource<Snapshot>;
+
+  // internal constructor
   constructor(
-    public registry: MetricsRegistry,
+    public registry: Registry,
     public prefix: string = "",
     public tags: Tags = NoTags
   ) {
-    // pass
+    this.events = registry.events;
+  }
+
+  /*
+   * Create a new registry for metrics, and return an object that can be
+   * used to create and modify them.
+   */
+  static create(options: RegistryOptions = {}): Metrics {
+    return new Metrics(new Registry(options), "", options.tags);
   }
 
   /*

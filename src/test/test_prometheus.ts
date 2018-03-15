@@ -1,20 +1,18 @@
-import { exportPrometheus, Metrics, MetricsRegistry } from "..";
+import { exportPrometheus, Metrics } from "..";
 
 import "should";
 import "source-map-support/register";
 
 
 describe("PrometheusObserver", () => {
-  let r: MetricsRegistry;
   let m: Metrics;
 
   beforeEach(() => {
-    r = new MetricsRegistry();
-    m = r.metrics;
+    m = Metrics.create();
   });
 
   afterEach(() => {
-    r.stop();
+    m.registry.stop();
   });
 
   function getTimestamp(line: string): number {
@@ -25,8 +23,8 @@ describe("PrometheusObserver", () => {
 
   it("makes empty file", () => {
     const docs: string[] = [];
-    r.events.map(exportPrometheus).forEach(d => docs.push(d));
-    r.publish();
+    m.events.map(exportPrometheus).forEach(d => docs.push(d));
+    m.registry.publish();
     docs.length.should.eql(1);
     const lines = docs[0].split("\n");
     lines.length.should.eql(2);
@@ -36,10 +34,10 @@ describe("PrometheusObserver", () => {
 
   it("reports counters & gauges", () => {
     const docs: string[] = [];
-    r.events.map(exportPrometheus).forEach(d => docs.push(d));
+    m.events.map(exportPrometheus).forEach(d => docs.push(d));
     m.increment(m.counter("trucks"), 10);
     m.setGauge(m.gauge("temperature"), 21);
-    r.publish();
+    m.registry.publish();
 
     docs.length.should.eql(1);
     const lines = docs[0].split("\n");
@@ -55,9 +53,9 @@ describe("PrometheusObserver", () => {
 
   it("reports distributions", () => {
     const docs: string[] = [];
-    r.events.map(exportPrometheus).forEach(d => docs.push(d));
+    m.events.map(exportPrometheus).forEach(d => docs.push(d));
     m.addDistribution(m.distribution("coins_building_4"), [ 10, 11, 12 ]);
-    r.publish();
+    m.registry.publish();
 
     docs.length.should.eql(1);
     const lines = docs[0].split("\n");
@@ -75,12 +73,12 @@ describe("PrometheusObserver", () => {
 
   it("reports with tags", () => {
     const docs: string[] = [];
-    r.events.map(exportPrometheus).forEach(d => docs.push(d));
+    m.events.map(exportPrometheus).forEach(d => docs.push(d));
     m.increment(m.counter("trucks", { state: "TN" }), 10);
     m.increment(m.counter("trucks", { state: "SC" }), 4);
     m.setGauge(m.gauge("trunks"), 15);
     m.setGauge(m.gauge("torque"), 16);
-    r.publish();
+    m.registry.publish();
 
     docs.length.should.eql(1);
     const lines = docs[0].split("\n");

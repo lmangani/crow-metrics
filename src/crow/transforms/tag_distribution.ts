@@ -1,6 +1,5 @@
 import { Distribution, MetricName, MetricType, Tags, tagsToMap } from "../metric_name";
 import { Metrics } from "../metrics";
-import { MetricsRegistry } from "../registry";
 import { Snapshot } from "../snapshot";
 
 /*
@@ -94,7 +93,7 @@ export function tagDistribution(metrics: Metrics, ...metricMatchers: MetricMatch
       const metric = metrics.registry.get(d);
       if (metric) metric.capture(map);
     }
-    
+
     return new Snapshot(snapshot.registry, snapshot.timestamp, map);
   };
 }

@@ -3,7 +3,7 @@ export { EventSource } from "./crow/events";
 export { Metric } from "./crow/metric";
 export { Metrics } from "./crow/metrics";
 export { Counter, Distribution, Gauge, MetricName, MetricType, NoTags, Tags } from "./crow/metric_name";
-export { BunyanLike, MetricsRegistry, RegistryOptions } from "./crow/registry";
+export { BunyanLike, Registry, RegistryOptions } from "./crow/registry";
 export { Snapshot } from "./crow/snapshot";
 
 export { deltaSnapshots } from "./crow/transforms/delta";

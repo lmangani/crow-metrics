@@ -1,6 +1,6 @@
 import { Metric } from "./metric";
 import { MetricName } from "./metric_name";
-import { MetricsRegistry } from "./registry";
+import { Registry } from "./registry";
 
 /*
  * Snapshot of the values of every metric in the system at a given time.
@@ -8,7 +8,7 @@ import { MetricsRegistry } from "./registry";
  * numeric values.
  */
 export class Snapshot {
-  constructor(public registry: MetricsRegistry, public timestamp: number, public map: Map<MetricName, number>) {
+  constructor(public registry: Registry, public timestamp: number, public map: Map<MetricName, number>) {
     // pass.
   }
 

@@ -4,12 +4,6 @@ import { Metrics } from "./metrics";
 import { Distribution, MetricName, MetricType, Tags } from "./metric_name";
 import { Snapshot } from "./snapshot";
 
-// import { Counter, Distribution, Gauge, Metrics } from "./metrics";
-// // import DeltaObserver from "./delta";
-// import { MetricName, MetricType, Tags } from "./metric_name";
-//
-// declare var require: any;
-
 const DEFAULT_PERCENTILES = [ 0.5, 0.9, 0.99 ];
 const DEFAULT_ERROR = 0.01;
 
@@ -43,20 +37,19 @@ export interface RegistryOptions {
 }
 
 /*
- * A MetricsRegistry is the central coordinator for metrics collection and
- * dispersal. It tracks metrics in a single namespace, and periodically
- * takes a snapshot and sends it to any observers. (A typical observer might
+ * Coordinator for metrics collection and dispersal within a single namespace.
+ * Values are set using a `Metrics` object, and the registry periodcially
+ * takes a snapshot and posts it to any listeners. (A typical listener might
  * push the metrics into riemann, influxdb, or prometheus.)
  *
- * Normally, you'd only create one of these, but it's perfectly valid to
- * create several and use them independently, if you want.
+ * You would usually not create one of these manually. Instead, you would use
+ * `Metrics.create()`, which creates a registry implicitly.
  */
-export class MetricsRegistry {
+export class Registry {
   // metrics are stored by their "fully-qualified" name, using stringified tags.
   registry: Map<string, Metric> = new Map();
 
   events = new EventSource<Snapshot>();
-  metrics: Metrics;
 
   percentiles: number[] = DEFAULT_PERCENTILES;
   error: number = DEFAULT_ERROR;
@@ -72,8 +65,6 @@ export class MetricsRegistry {
   timer?: NodeJS.Timer;
 
   constructor(public options: RegistryOptions = {}) {
-    this.metrics = new Metrics(this, "", options.tags);
-
     if (options.separator !== undefined) this.separator = options.separator;
     if (options.percentiles !== undefined) this.percentiles = options.percentiles;
     if (options.error !== undefined) this.error = options.error;

@@ -1,6 +1,6 @@
 "use strict";
 
-import { tagDistribution, MetricsRegistry, Snapshot } from "..";
+import { tagDistribution, Metrics, Snapshot } from "..";
 
 import "should";
 import "source-map-support/register";
@@ -11,26 +11,25 @@ function delay(msec: number): Promise<any> {
 }
 
 describe("tagDistribution", () => {
-  let r: MetricsRegistry;
+  let m: Metrics;
 
   beforeEach(() => {
-    r = new MetricsRegistry();
+    m = Metrics.create();
   });
 
   afterEach(() => {
-    r.stop();
+    m.registry.stop();
   });
 
   it("will turn a counter into a distribution, by tag", () => {
-    const m = r.metrics;
     const snapshots: Snapshot[] = [];
     const matcher = { name: "traffic_per_session", match: "bytes", sortByTags: [ "session" ] };
-    r.events.map(tagDistribution(m, matcher)).forEach(s => snapshots.push(s));
+    m.events.map(tagDistribution(m, matcher)).forEach(s => snapshots.push(s));
 
     m.increment(m.counter("bytes", { session: "3" }), 10);
     m.increment(m.counter("bytes", { session: "4" }), 20);
     m.increment(m.counter("bytes", { session: "5" }), 30);
-    r.publish();
+    m.registry.publish();
     Array.from(snapshots[0].flatten()).sort().should.eql([
       [ "traffic_per_session{p=0.5}", 20 ],
       [ "traffic_per_session{p=0.99}", 30 ],
@@ -41,16 +40,15 @@ describe("tagDistribution", () => {
   });
 
   it("will preserve other tags when constructing distributions", () => {
-    const m = r.metrics;
     const snapshots: Snapshot[] = [];
     const matcher = { name: "traffic_per_session", match: "bytes", sortByTags: [ "session" ] };
-    r.events.map(tagDistribution(m, matcher)).forEach(s => snapshots.push(s));
+    m.events.map(tagDistribution(m, matcher)).forEach(s => snapshots.push(s));
 
     m.increment(m.counter("bytes", { type: "cat", session: "3" }), 10);
     m.increment(m.counter("bytes", { type: "mouse", session: "4" }), 20);
     m.increment(m.counter("bytes", { type: "mouse", session: "5" }), 29);
     m.increment(m.counter("bytes", { type: "mouse", session: "5" }), 1);
-    r.publish();
+    m.registry.publish();
     Array.from(snapshots[0].flatten()).sort().should.eql([
       [ "traffic_per_session{p=0.5,type=cat}", 10 ],
       [ "traffic_per_session{p=0.5,type=mouse}", 30 ],

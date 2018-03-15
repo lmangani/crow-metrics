@@ -1,67 +1,64 @@
-import { deltaSnapshots, MetricsRegistry, RingBuffer } from "..";
+import { deltaSnapshots, Metrics, RingBuffer } from "..";
 
 import "should";
 import "source-map-support/register";
 
 
 describe("RingBufferObserver", () => {
-  let r: MetricsRegistry;
+  let m: Metrics;
 
   beforeEach(() => {
-    r = new MetricsRegistry();
+    m = Metrics.create();
   });
 
   afterEach(() => {
-    r.stop();
+    m.registry.stop();
   });
 
   it("tracks gauges", () => {
-    const m = r.metrics;
     const rb = new RingBuffer();
-    r.events.map(deltaSnapshots()).attach(rb);
+    m.events.map(deltaSnapshots()).attach(rb);
     m.setGauge(m.gauge("speed"), 45);
-    r.publish();
+    m.registry.publish();
     m.setGauge(m.gauge("speed"), 55);
-    r.publish();
+    m.registry.publish();
     m.setGauge(m.gauge("speed"), 35);
-    r.publish();
+    m.registry.publish();
     rb.get().map(s => s.flatten().get("speed")).should.eql([ 45, 55, 35 ]);
     (rb.getLatest().flatten().get("speed") || 0).should.eql(35);
   });
 
   it("tracks counters", () => {
-    const m = r.metrics;
     const rb = new RingBuffer();
-    r.events.map(deltaSnapshots()).attach(rb);
+    m.events.map(deltaSnapshots()).attach(rb);
     m.increment(m.counter("bruises"));
-    r.publish();
-    m.increment(m.counter("bruises"));
-    m.increment(m.counter("bruises"));
-    r.publish();
-    m.increment(m.counter("bruises"));
-    r.publish();
-    r.publish();
+    m.registry.publish();
     m.increment(m.counter("bruises"));
     m.increment(m.counter("bruises"));
-    r.publish();
+    m.registry.publish();
+    m.increment(m.counter("bruises"));
+    m.registry.publish();
+    m.registry.publish();
+    m.increment(m.counter("bruises"));
+    m.increment(m.counter("bruises"));
+    m.registry.publish();
     rb.get().map(s => s.flatten().get("bruises")).should.eql([ 1, 2, 1, 0, 2 ]);
     (rb.getLatest().flatten().get("bruises") || 0).should.eql(2);
     m.getCounter(m.counter("bruises")).should.eql(6);
   });
 
   it("tracks distributions", () => {
-    const m = r.metrics;
     const rb = new RingBuffer();
-    r.events.map(deltaSnapshots()).attach(rb);
+    m.events.map(deltaSnapshots()).attach(rb);
     const d = m.distribution("timings", {}, [ 0.5, 0.9 ]);
     m.addDistribution(d, 2);
     m.addDistribution(d, 5);
     m.addDistribution(d, 10);
-    r.publish();
+    m.registry.publish();
     m.addDistribution(d, 3);
     m.addDistribution(d, 4);
     m.addDistribution(d, 6);
-    r.publish();
+    m.registry.publish();
 
     const flattened = rb.get().map(s => s.flatten());
     flattened.map(s => s.get("timings{p=count}")).should.eql([ 3, 3 ]);
@@ -72,18 +69,17 @@ describe("RingBufferObserver", () => {
   });
 
   it("reports missing metrics", () => {
-    const m = r.metrics;
     const rb = new RingBuffer();
-    r.events.map(deltaSnapshots()).attach(rb);
+    m.events.map(deltaSnapshots()).attach(rb);
     m.increment(m.counter("cats"), 3);
-    r.publish();
+    m.registry.publish();
     m.increment(m.counter("cats"), 2);
-    r.publish();
+    m.registry.publish();
     m.increment(m.counter("cats"), 4);
     m.increment(m.counter("dogs"), 1);
-    r.publish();
+    m.registry.publish();
     m.increment(m.counter("dogs"), 7);
-    r.publish();
+    m.registry.publish();
 
     const flattened = rb.get().map(s => s.flatten());
     flattened.map(s => s.get("cats")).should.eql([ 3, 2, 4, 0 ]);
@@ -93,31 +89,30 @@ describe("RingBufferObserver", () => {
   });
 
   it("rotates correctly", () => {
-    const m = r.metrics;
-    const rb = new RingBuffer({ span: r.period * 5 });
-    r.events.map(deltaSnapshots()).attach(rb);
+    const rb = new RingBuffer({ span: m.registry.period * 5 });
+    m.events.map(deltaSnapshots()).attach(rb);
     m.increment(m.counter("bugs"), 1);
-    r.publish();
+    m.registry.publish();
     m.increment(m.counter("bugs"), 2);
-    r.publish();
+    m.registry.publish();
     m.increment(m.counter("bugs"), 3);
-    r.publish();
+    m.registry.publish();
 
     const flattened1 = rb.get().map(s => s.flatten());
     flattened1.map(s => s.get("bugs")).should.eql([ 1, 2, 3 ]);
 
     m.increment(m.counter("bugs"), 4);
-    r.publish();
+    m.registry.publish();
     m.increment(m.counter("bugs"), 5);
-    r.publish();
+    m.registry.publish();
 
     const flattened2 = rb.get().map(s => s.flatten());
     flattened2.map(s => s.get("bugs")).should.eql([ 1, 2, 3, 4, 5 ]);
 
     m.increment(m.counter("bugs"), 6);
-    r.publish();
+    m.registry.publish();
     m.increment(m.counter("bugs"), 7);
-    r.publish();
+    m.registry.publish();
 
     const flattened3 = rb.get().map(s => s.flatten());
     flattened3.map(s => s.get("bugs")).should.eql([ 3, 4, 5, 6, 7 ]);
