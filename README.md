@@ -57,29 +57,15 @@ webService.get("/", function (request, response) {
 
 ## How does it work?
 
+Metrics are collected in a `Registry` (usually there is only one). On a configurable period, these metrics are summarized and sent to listeners. The listeners can push the summary to a push-based service like Graphite, or post the results to a web service for a poll-based service like Prometheus.
+
+-----xxx----- FIXME link to manual.md
 Metrics consist of:
 
   - **counters**: numbers that increase only (never decrease), like the number of requests handled since the server started.
   - **gauges**: dials that measure a changing state, like the number of currently open connections, or the amount of memory being used.
   - **distributions**: samples that are interesting for their histogram, like timings (95th percentile of database reads, for example).
 
-Metrics are collected in a `Registry` (usually there is only one). On a configurable period, these metrics are summarized and sent to listeners. The listeners can push the summary to a push-based service like Graphite, or post the results to a web service for a poll-based service like Prometheus.
-
-Each metric has a name, which is a string. Crow doesn't care what's in the string, but if you're sending metrics to a service, most of them have a naming convention. In general, you should use a name that could be an identifier (starts with a letter, contains only letters, digits, and underscore). Some metrics services use dot to build folder-like namespaces. Typical metric names are:
-
-  - `requests_received`
-  - `mysql_select_count`
-  - `users_query_msec`
-
-The last one is an example of a timing. As a convention, timings should include the time unit as the last segment of their name.
-
-Each metric may also have a set of "tags" attached. A tag is a name/value pair, both strings, that identifies some variant of the metric. For example, a request handler may use a different tag for successful operations and exceptions. When generating string forms of metrics, the tags are appended in alphabetical order, separated by commas, surrounded by curly braces. (This is a standard form used by most of the open-source metrics services.)
-
-  - `requests_handled{success=true}`
-  - `requests_handled{exception=IOError}`
-  - `requests_handled{exception=AccessDenied}`
-
-Tags are used by metrics services to split out interesting details while allowing the general case (`requests_handled` above) to be summarized.
 
 
 ## License

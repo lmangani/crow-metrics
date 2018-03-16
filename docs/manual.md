@@ -2,83 +2,199 @@
 
 This manual is meant to cover every aspect of a fairly tiny library. The sections are all independent, so feel free to jump right to the section that sounds most relevant to your interests.
 
+- [Concepts](#concepts)
+    - [Tags](#tags)
+    - [Distributions](#distributions)
 - [API](#api)
-  - [MetricsRegistry](#metricsregistry)
-  - [Snapshot](#snapshot)
+    - [Metrics](#metrics)
+    - [Registry](#registry)
+    - [Snapshot](#snapshot)
 - [Metrics objects](#metrics-objects)
-  - [Gauge](#gauge)
-  - [Counter](#counter)
-  - [Distribution](#distribution)
+    - [Gauge](#gauge)
+    - [Counter](#counter)
+    - [Distribution](#distribution)
 - [Observers](#observers)
-  - [DeltaObserver](#deltaobserver)
-  - [RingBufferObserver](#ringbufferobserver)
+    - [DeltaObserver](#deltaobserver)
+    - [RingBufferObserver](#ringbufferobserver)
 - [Built-in plugins](#built-in-plugins)
-  - [InfluxDB](#influxdb)
-  - [Prometheus](#prometheus)
-  - [Viz](#viz)
+    - [InfluxDB](#influxdb)
+    - [Prometheus](#prometheus)
+    - [Viz](#viz)xxx
+
+
+## Concepts
+
+Each metric has a name and type. The name is a string, and crow doesn't limit what can be in that string, but most aggregation services are very opinionated about their naming convention. In general, you should probably restrict metric names to names that could be valid javascript variable names: start with a letter, and use only letters, digits, and underscore (`_`). Some aggregators will use dot (`.`) or slash (`/`) to build a folder-like tree of namespaces.
+
+Typical metric names are:
+
+  - `requests_received`
+  - `mysql_select_count`
+  - `users_query_msec`
+
+The last one is an example of a timing. As a convention, timings should include the time unit as the last segment of their name.
+
+Metric types are:
+
+  - **counters**: numbers that increase only (never decrease)
+      - example: the number of "200 OK" requests this web server has returned
+  - **gauges**: dials that measure a changing state
+      - example: the number of connections open, or requests currently running
+      - example: the amount of memery being used (`process.memoryUsage().heapUsed`)
+  - **distributions**: samples that are interesting for their [histogram](https://en.wikipedia.org/wiki/Histogram)
+      - example: database query timings, to determine 95th percentile response time
+
+### Tags
+
+Each metric may also have a set of "tags" attached. A tag is a name/value pair, both strings, that identifies some variant of the metric.
+
+Tags are used by aggregators to split out interesting details while allowing the general case to be summarized. For example, a request handler may use a different tag for successful operations and exceptions:
+
+  - `requests_handled{success=true}`
+  - `requests_handled{exception=IOError,success=false}`
+  - `requests_handled{exception=AccessDenied,success=false}`
+
+You can then build one graph showing total requests handled, another that compares successful requests to all failures, and another that breaks out each failure.
+
+Metric names can be formatted into strings any way you like, by providing a formatter. The default format is to append each tag in alphabetical order, separated by commas, surrounded by curly braces. (This is a standard form used by most of the open-source aggregators.)
+
+### Distributions
+
+Distributions are collected and sampled using a method described in ["Effective Computation of Biased Quantiles over Data Streams"](http://www.cs.rutgers.edu/~muthu/bquant.pdf). It attempts to keep only the samples closest to the desired percentiles, so for example, if you only want the median, it keeps most of the samples that fall in the middle of the range, but discards samples on either end. To do this, the algorithm needs to know the desired percentiles, and the allowable error.
+
+For most uses, this is overkill. If you specify an allowable rank error of 1%, and have fewer than 100 samples each minute, it's unlikely to discard _any_ of the samples, and will compute the percentiles directly. But if you have thousands of samples, it will discard most of them as it narrows in on the likely range of each percentile.
+
+The upshot is that for small servers, it's equivalent to keeping all the samples and computing the percentiles exactly on each interval. For large servers, it processes batches of samples at a time (varying based on the desired error; 50 at a time for 1%) and computes a close estimate, using a small fraction of the samples.
+
+Crow reports distributions as a collection of the computed percentiles you've requested, as well as the sum and count, by adding a `"p"` tag. If you're tracking a distribution of request timings called `request_msec`, and you've asked for percentiles 0.5, 0.9, and 0.99 (the median, 90th percentile, and 99th percentile), it will report these gauges:
+
+```
+request_msec{p=0.5}
+request_msec{p=0.9}
+request_msec{p=0.99}
+request_msec{p=sum}
+request_msec{p=count}
+```
+
+Exporters will usually format these gauges in a form that the aggregator expects.
 
 
 ## API
 
-The top-level API consists of a [MetricsRegistry](#metricsregistry) class for recording metrics, and some classes and functions for reporting those metrics to other services at a regular interval.
+The top-level API consists of:
+
+  - [Metrics](#metrics) for defining and recording metrics
+  - [Registry](#registry) for collecting and reporting those metrics at a regular interval
+  - [Snapshot](#snapshot) representing the periodic report
+
+as well as transforms to convert `Snapshot`s into other formats, and exporters to help provide snapshots to aggregators like InfluxDB and Prometheus, in their preferred formats.
 
 
-### MetricsRegistry
+### Metrics
 
-The registry is the central coordinator for metrics collection and dispersal. It tracks metrics in a single namespace, and periodically takes a snapshot and sends it to any observers. (A typical observer might push the metrics into graphite, riemann, influxdb, or prometheus.)
+The primary interface for creating and updating metrics is `Metrics`. Each `Metrics` object belongs to a single registry (described below) and adds a prefix and set of default tags to all metrics it creates.
 
+  - `const metrics = Metrics.create(options: RegistryOptions = {})`
+
+
+#### Options
+
+- `period: number` (in milliseconds, default=60_000) - How often should snapshots be sent to observers? One minute is a good starting point, though some people prefer 30 seconds or even less. Crow will recognize a round number and arrange the timer to go off at "round" times, so for example, a one-minute period will report at the top of each minute (11:23:00, 11:24:00, ...).
+
+- `log: BunyanLike` - If you want to see debug logs, provide a [bunyan](https://www.npmjs.com/package/bunyan)-compatible logger here. Otherwise, nothing will be logged.
+
+- `percentiles: number[]` - Which percentiles do you want to report for distributions (like timings)? The values must be real numbers between 0 and 1. The default is `[ 0.5, 0.9, 0.99 ]`, or the 50th (median), 90th, and 99th percentiles. This option is used as a default, and may be overridden by individual distributions. For more about how the distributions are calculated, see [distributions](#distributions) above.
+
+- `error: number` - What rank error is acceptible when approximating percentiles? The default is `0.01` (1%), which is usually fine.
+
+- `tags: Tags` (object or ES6 `Map` of string keys & string values) - What tags should be applied to every metric? This is used to "pre-seed" a set of tags that refer to this service instance as a whole, like `instanceId` or `hostname`. They can be used to distinguish metrics reported from multiple nodes. The default is to add no extra tags.
+
+- `expire: number` (in milliseconds) - How long should a metric go without an update, before Crow stops reporting on it? The default is "forever": never expire old metrics. This only applies to counters and distributions, and only matters if you use external data (like client IP or username) in tags -- which you should probably avoid. But if you do that, you could end up with thousands of stale metrics that refer to users who logged out hours ago, so you should use this option to let Crow stop reporting them.
+
+
+#### Adding tags or a prefix
+
+A "child" `Metrics` object can be created that prefixes all metric names with a string, or attaches a default set of tags. This can be useful for handing to a sub-module, like a session or a database manager. For example, to attach an instance ID to every metric, and prefix them with `"db_"`:
+
+```
+const newMetrics = metrics.withTags({ instanceId: this.instanceId }).withPrefix("db_");
+```
+
+The methods are:
+
+- `withPrefix(prefix: string): Metrics`
+
+  Return a new Metrics object that represents the same registry, but adds this prefix to all names. This call can be used multiple times, to build nested prefixes.
+
+- `withTags(tags: Tags): Metrics`
+
+  Return a new Metrics object that represents the same registry, with an extra set of default tags.
+
+
+#### Creating metrics
+
+Because collecting metrics will often be in the "fast path" of your server, crow offloads the work of creating and naming metrics into the creation of `Counter`, `Gauge`, and `Distribution` objects. These objects contain the name and tags, and a precomputed key for looking up their current value in the registry. You should create these objects as early as possible, at server initialization time, or when a new session or request is created.
+
+These methods on `Metrics` will create metric objects:
+
+- `counter(name: string, tags: Tags = NoTags): Counter`
+- `gauge(name: string, tags: Tags = NoTags): Gauge`
+- `distribution(name: string, tags: Tags = NoTags, percentiles?: number[], error?: number): Distribution`
+
+
+#### Updating metrics
+
+These methods on `Metrics` will update a counter, gauge, or distribution:
+
+- `increment(name: Counter, count: number = 1)`
+
+  Increment a counter.
+
+- `getCounter(name: Counter): number`
+
+  Get the current value of a counter.
+
+- `setGauge(name: Gauge, getter: number | (() => number))`
+
+  Add (or replace) a gauge. The getter is normally a function that computes the value on demand, but if the value changes rarely or never, you may use a constant value instead.
+
+- `removeGauge(name: Gauge)`
+
+  Remove a gauge.
+
+- `addDistribution(name: Distribution, data: number | number[])`
+
+  Add a data point (or array of data points) to a distribution.
+
+- `time<A>(name: Distribution, f: () => A): A`
+
+  Time a function call (in milliseconds) and record it as a data point in a distribution. Exceptions are not recorded. An example use: `metrics.time(requestTiming, () => this.handleRequest())`
+
+- `timePromise<A>(name: Distribution, f: () => Promise<A>): Promise<A>`
+
+  Time a function call that returns a promise (in milliseconds) and record it as a data point in a distribution. Rejected promises are not recorded.
+
+- `timeMicro<A>(name: Distribution, f: () => A): A`
+
+  Time a function call (in microseconds) and record it as a data point in a distribution. Exceptions are not recorded. This uses the new `perf_hooks` library in nodejs 8.
+
+- `timeMicroPromise<A>(name: Distribution, f: () => Promise<A>): Promise<A>`
+
+  Time a function call that returns a promise (in microseconds) and record it as a data point in a distribution. Rejected promises are not recorded. This uses the new `perf_hooks` library in nodejs 8.
+
+
+### Registry
+
+The registry is the central coordinator for metrics collection and dispersal. It tracks metrics in a single namespace, and periodically takes a snapshot and sends it to any listeners. (A typical listener might push the metrics into graphite, riemann, influxdb, or prometheus.)
+
+-----xxx-----
   - `new MetricsRegistry(options = {})`
 
-Options:
 
-  - `period` (in milliseconds, default=60_000) - How often should snapshots be sent to observers? One minute is a good starting point, though some people prefer 30 seconds or even less. Crow will recognize a round number and arrange the timer to go off at "round" times, so for example, a one-minute period will report at the top of each minute (11:23:00, 11:24:00, ...).
 
-  - `log` - If you want to see debug logs, provide a bunyan-compatible logger here. Otherwise, nothing will be logged.
 
-  - `percentiles` (array of numbers) - Which percentiles do you want to report for distributions (like timings)? The values must be real numbers between 0 and 1. The default is `[ 0.5, 0.9, 0.99 ]`, or the 50th (median), 90th, and 99th percentiles. This option is used as a default, and may be overridden by individual metrics. For more about how the distributions are calculated, see [distributions](#distributions) below.
-
-  - `error` - What rank error is acceptible when approximating percentiles? The default is `0.01` (1%), which is usually fine.
-
-  - `tags` (object of string keys & string values) - What tags should be applied to every metric? This is used to "pre-seed" a set of tags that refer to this service instance as a whole, like `instanceId` or `hostname`. They can be used to distinguish metrics reported from multiple nodes. The default is to add no extra tags.
-
-  - `separator` (string) - When using segmented metric names (via `withPrefix`), what should it use to separate the segments in a full name? The default is `"_"`.
-
-  - `expire` (in milliseconds) - How long should a metric go without an update, before Crow stops reporting on it? The default is "forever": never expire old metrics. This only applies to counters and distributions, and only matters if you use external data (like client IP or username) in tags -- which you should probably avoid. But if you do that, you could end up with thousands of stale metrics that refer to users who logged out hours ago, so you should use this option to let Crow discard them.
 
 Methods:
-
-  - `counter(name, tags = {})`
-
-    Return a new or existing counter with the given name and tags. Counter objects may be cached, or you may call `counter` to look it up each time. See [Metrics objects](#metrics-objects) below for the counter object API.
-
-  - `setGauge(name, tags = {}, getter)`
-
-    Build a new gauge with the given name, tags, and "getter". The "getter" is usually a function that will be called when crow wants to know the current value. If the value changes rarely, `getter` may be a number instead, and you can call `setGauge` with a new number each time the value changes.
-
-  - `gauge(name, tags = {})`
-
-    Return the gauge with the given name and tags. If no such gauge is found, it throws an exception. See [Metrics objects](#metrics-objects) below for the gauge object API.
-
-  - `removeGauge(name, tags = {})`
-
-    Remove the gauge with the given name and tags. This forcefully "expires" a gauge in the same way that counters and distributions can be implicitly expired with the `expire` option.
-
-  - `distribution(name, tags = {}, percentiles = this.percentiles, error = this.error)`
-
-    Return a new or existing distribution with the given name and tags. If `percentiles` or `error` is non-null, they will override the registry defaults. See [Metrics objects](#metrics-objects) below for the distribution object API.
-
-  - `withPrefix(prefix)`
-
-    Return a registry-like object which prefixes all metric names with the given prefix plus the separator (usually "\_" but set in a `MetricsRegistry` constructor option). The returned object is really a "view" of this registry with each metric name prefixed. For example, the following two lines create or find the same counter:
-
-    ```javascript
-    const registry = new crow.MetricsRegistry({ separator: "." });
-
-    registry.counter("cats.meals")
-    registry.withPrefix("cats").counter("meals")
-    ```
-
-    You can use this to namespace metrics in sub-modules.
 
   - `addObserver(observer)`
 
@@ -121,82 +237,6 @@ The default `flatten()` method will generate a flat `Map` of string keys to numb
 }
 ```
 
-
-## Metrics objects
-
-All metrics objects created by a `MetricsRegistry` have at least these fields:
-
-  - `name` - as given when the metric was created
-  - `type` - the lowercase version of the class name (`gauge`, `counter`, or `distribution`)
-  - `tags` - a `Tags` object wrapping a `Map` of string tag names and string values
-  - `value` - the current value, either as a number, or (for distributions) a `Map` of string keys to numbers
-
-Other methods vary based on the type:
-
-### Gauge
-
-  - `set(getter)`
-
-    Replace the gauge's getter function.
-
-### Counter
-
-  - `increment(count = 1, tags = {})`
-
-    Increment the counter. If `tags` is given, it's a shortcut for calling `withTags()` first.
-
-  - `withTags(tags)`
-
-    Return a new or existing counter with the same name as this one, but different tags. This is useful if you have a cached counter object for a name, but sometimes want to increment a counter with a different tag (like an exception name).
-
-### Distribution
-
-Distributions are collected and sampled using a method described in ["Effective Computation of Biased Quantiles over Data Streams"](http://www.cs.rutgers.edu/~muthu/bquant.pdf). It attempts to keep only the samples closest to the desired percentiles, so for example, if you only want the median, it keeps most of the samples that fall in the middle of the range, but discards samples on either end. To do this, the algorithm needs to know the desired percentiles, and the allowable error.
-
-For most uses, this is overkill. If you specify an allowable rank error of 1%, and have fewer than 100 samples each minute, it's unlikely to discard _any_ of the samples, and will compute the percentiles directly. But if you have thousands of samples, it will discard most of them as it narrows in on the likely range of each percentile.
-
-The upshot is that for small servers, it's equivalent to keeping all the samples and computing the percentiles exactly on each interval. For large servers, it processes batches of samples at a time (varying based on the desired error; 50 at a time for 1%) and computes a close estimate, using a small fraction of the samples.
-
-  - `value`
-
-    Compute percentiles based on the samples collected, and reset the collection. This is a destructive operation, so normally it's only used by `MetricsRegistry` to generate the periodic snapshots.
-
-    The returned `Map` will contain a key for each percentile requested, and two additional metrics:
-      - a `count` metric to report the number of samples in this time period
-      - a `sum` metric to report the sum of all samples in this time period
-
-    Percentiles are represented by their numeric value ("0.5").
-
-    For example, when computing the 50th and 95th percentiles of a metric called `request_time_msec`, `value` will return a `Map` like this:
-
-    ```javascript
-    {
-      "0.5": 23,
-      "0.95": 81,
-      "count": 104,
-      "sum": 4188
-    }
-    ```
-
-  - `add(data)`
-
-    Add a sample to the distribution. If `data` is an array, all the data points in the array are added.
-
-  - `time(f)`
-
-    Call `f` as a function, recording the time it takes to complete, in milliseconds. If `f` returns a promise (an object with a field named `then` which is a function), it will record the time it takes the promise to complete. Returns whatever `f` returns, so you can call it inline like:
-
-    ```javascript
-    const dbTimer = registry.distribution("db_select_msec");
-
-    dbTimer.time(db.select("...")).then(function (rows) {
-      // ...
-    });
-    ```
-
-  - `withTags(tags)`
-
-    Return a new or existing distribution with the same name as this one, but different tags.
 
 
 ## Observers
