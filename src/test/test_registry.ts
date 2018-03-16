@@ -168,11 +168,11 @@ describe("MetricsRegistry", () => {
   });
 
   it("can sub-divide by prefix", () => {
-    const mm = m.withPrefix("myserver");
+    const mm = m.withPrefix("myserver_");
     mm.setGauge(mm.gauge("gauge"), 10);
     mm.increment(mm.counter("counter"), 3);
     mm.addDistribution(mm.distribution("dist", {}, [ 0.5 ]), 100);
-    const m2 = mm.withPrefix("moar");
+    const m2 = mm.withPrefix("moar_");
     m2.increment(m2.counter("wut"), 8);
 
     Array.from(m.registry.snapshot().flatten().keys()).sort().should.eql([
@@ -184,9 +184,9 @@ describe("MetricsRegistry", () => {
       "myserver_moar_wut"
     ]);
 
-    const m3 = Metrics.create({ separator: "." });
+    const m3 = Metrics.create();
     try {
-      const mm = m3.withPrefix("prod").withPrefix("racetrack");
+      const mm = m3.withPrefix("prod.").withPrefix("racetrack.");
       m3.increment(mm.counter("requests"));
       Array.from(m3.registry.snapshot().flatten().keys()).sort().should.eql([
         "prod.racetrack.requests"
@@ -277,7 +277,7 @@ describe("MetricsRegistry", () => {
     m.events.forEach(s => snapshots.push(s));
 
     const aura = m.gauge("aura");
-    const spirit = m.withPrefix("owl").gauge("spirit");
+    const spirit = m.withPrefix("owl_").gauge("spirit");
 
     m.setGauge(aura, () => 23);
     m.setGauge(spirit, () => 17);

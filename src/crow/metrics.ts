@@ -159,9 +159,12 @@ export class Metrics {
 
   /*
    * Return a new Metrics object that represents the same registry, but
-   * prefixes all names with `(prefix)(registry.separator)`.
+   * adds this prefix to all names. This call can be used multiple times, to
+   * build nested prefixes:
+   *
+   *     m.withPrefix("a_").withPrefix("b_") == m.withPrefix("a_b_")
    */
   withPrefix(prefix: string): Metrics {
-    return new Metrics(this.registry, this.prefix + prefix + this.registry.separator, this.tags);
+    return new Metrics(this.registry, this.prefix + prefix, this.tags);
   }
 }

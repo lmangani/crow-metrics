@@ -17,9 +17,6 @@ export interface RegistryOptions {
   // default tags to apply to each metric:
   tags?: Tags;
 
-  // what to use in `withPrefix`; default is "_"
-  separator?: string;
-
   // default percentiles to track on distributions
   percentiles?: number[];
 
@@ -54,7 +51,6 @@ export class Registry {
   percentiles: number[] = DEFAULT_PERCENTILES;
   error: number = DEFAULT_ERROR;
 
-  separator = "_";
   currentTime = Date.now();
   version = "?";
 
@@ -65,7 +61,6 @@ export class Registry {
   timer?: NodeJS.Timer;
 
   constructor(public options: RegistryOptions = {}) {
-    if (options.separator !== undefined) this.separator = options.separator;
     if (options.percentiles !== undefined) this.percentiles = options.percentiles;
     if (options.error !== undefined) this.error = options.error;
     if (options.period !== undefined) this.period = options.period;
