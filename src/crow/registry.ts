@@ -123,7 +123,7 @@ export class Registry {
    * Return a snapshot of the current value of each metric.
    * Distributions will be reset.
    */
-  snapshot(timestamp: number = Date.now()) {
+  snapshot(timestamp: number = Date.now()): Snapshot {
     const map = new Map<MetricName, number>();
     for (const metric of this.registry.values()) {
       metric.capture(map);
