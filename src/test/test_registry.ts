@@ -196,6 +196,16 @@ describe("MetricsRegistry", () => {
     }
   });
 
+  it("can sub-divide by tags", () => {
+    const mm = m.withTags({ instanceId: "i-ff00ff00" });
+    mm.increment(mm.counter("widgets"));
+    mm.increment(mm.counter("errors", { code: "500" }));
+    Array.from(m.registry.snapshot().flatten().keys()).sort().should.eql([
+      "errors{code=500,instanceId=i-ff00ff00}",
+      "widgets{instanceId=i-ff00ff00}",
+    ]);
+  });
+
   it("expires unused counters and distributions", async () => {
     const snapshots: Snapshot[] = [];
     m.registry.stop();

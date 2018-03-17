@@ -1,5 +1,5 @@
 import { EventSource } from "./events";
-import { Counter, Distribution, Gauge, MetricType, NoTags, Tags } from "./metric_name";
+import { Counter, Distribution, Gauge, MetricType, NoTags, Tags, tagsToMap } from "./metric_name";
 import { Registry, RegistryOptions } from "./registry";
 import { Snapshot } from "./snapshot";
 import { performance } from "perf_hooks";
@@ -113,7 +113,7 @@ export class Metrics {
    * Time a function call (in milliseconds) and record it as a data point in
    * a distribution. Exceptions are not recorded.
    */
-  time<T>(name: Distribution, f: () => T): T {
+  time<A>(name: Distribution, f: () => A): A {
     const startTime = Date.now();
     const rv = f();
     this.addDistribution(name, Date.now() - startTime);
@@ -125,7 +125,7 @@ export class Metrics {
    * record it as a data point in a distribution. Rejected promises are not
    * recorded.
    */
-  timePromise<T>(name: Distribution, f: () => Promise<T>): Promise<T> {
+  timePromise<A>(name: Distribution, f: () => Promise<A>): Promise<A> {
     const startTime = Date.now();
     return f().then(rv => {
       this.addDistribution(name, Date.now() - startTime);
@@ -137,7 +137,7 @@ export class Metrics {
    * Time a function call (in microseconds) and record it as a data point in
    * a distribution. Exceptions are not recorded.
    */
-  timeMicro<T>(name: Distribution, f: () => T): T {
+  timeMicro<A>(name: Distribution, f: () => A): A {
     const startTime = performance.now();
     const rv = f();
     this.addDistribution(name, performance.now() - startTime);
@@ -149,7 +149,7 @@ export class Metrics {
    * record it as a data point in a distribution. Rejected promises are not
    * recorded.
    */
-  timeMicroPromise<T>(name: Distribution, f: () => Promise<T>): Promise<T> {
+  timeMicroPromise<A>(name: Distribution, f: () => Promise<A>): Promise<A> {
     const startTime = performance.now();
     return f().then(rv => {
       this.addDistribution(name, performance.now() - startTime);
@@ -166,5 +166,13 @@ export class Metrics {
    */
   withPrefix(prefix: string): Metrics {
     return new Metrics(this.registry, this.prefix + prefix, this.tags);
+  }
+
+  /*
+   * Return a new Metrics object that represents the same registry, with an
+   * extra set of default tags.
+   */
+  withTags(tags: Tags): Metrics {
+    return new Metrics(this.registry, this.prefix, tagsToMap(this.tags, tags));
   }
 }
