@@ -6,20 +6,21 @@ This manual is meant to cover every aspect of a fairly tiny library. The section
     - [Tags](#tags)
     - [Distributions](#distributions)
 - [API](#api)
-    - [Metrics](#metrics)
-    - [Registry](#registry)
-    - [Snapshot](#snapshot)
-- [Metrics objects](#metrics-objects)
-    - [Gauge](#gauge)
-    - [Counter](#counter)
-    - [Distribution](#distribution)
-- [Observers](#observers)
-    - [DeltaObserver](#deltaobserver)
-    - [RingBufferObserver](#ringbufferobserver)
-- [Built-in plugins](#built-in-plugins)
-    - [InfluxDB](#influxdb)
-    - [Prometheus](#prometheus)
-    - [Viz](#viz)xxx
+- [Metrics](#metrics)
+    - [Options](options)
+    - [Adding tags or a prefix](adding-tags-or-a-prefix)
+    - [Creating metrics](#creating-metrics)
+    - [Updating metrics](#updating-metrics)
+- [Registry](#registry)
+    - [Events](#events)
+- [Snapshot](#snapshot)
+- [Transforms](#transforms)
+    - [deltaSnapshots](#deltasnapshots)
+    - [tagDistribution](#tagdistribution)
+    - [RingBuffer](#ringbuffer)
+- [Exporters]
+    - [exportInfluxDb](#exportinfluxdb)
+    - [exportPrometheus](#exportprometheus)
 
 
 ## Concepts
@@ -90,14 +91,14 @@ The top-level API consists of:
 as well as transforms to convert `Snapshot`s into other formats, and exporters to help provide snapshots to aggregators like InfluxDB and Prometheus, in their preferred formats.
 
 
-### Metrics
+## Metrics
 
 The primary interface for creating and updating metrics is `Metrics`. Each `Metrics` object belongs to a single registry (described below) and adds a prefix and set of default tags to all metrics it creates.
 
   - `const metrics = Metrics.create(options: RegistryOptions = {})`
 
 
-#### Options
+### Options
 
 - `period: number` (in milliseconds, default=60_000) - How often should snapshots be sent to observers? One minute is a good starting point, though some people prefer 30 seconds or even less. Crow will recognize a round number and arrange the timer to go off at "round" times, so for example, a one-minute period will report at the top of each minute (11:23:00, 11:24:00, ...).
 
@@ -112,7 +113,7 @@ The primary interface for creating and updating metrics is `Metrics`. Each `Metr
 - `expire: number` (in milliseconds) - How long should a metric go without an update, before Crow stops reporting on it? The default is "forever": never expire old metrics. This only applies to counters and distributions, and only matters if you use external data (like client IP or username) in tags -- which you should probably avoid. But if you do that, you could end up with thousands of stale metrics that refer to users who logged out hours ago, so you should use this option to let Crow stop reporting them.
 
 
-#### Adding tags or a prefix
+### Adding tags or a prefix
 
 A "child" `Metrics` object can be created that prefixes all metric names with a string, or attaches a default set of tags. This can be useful for handing to a sub-module, like a session or a database manager. For example, to attach an instance ID to every metric, and prefix them with `"db_"`:
 
@@ -131,7 +132,7 @@ The methods are:
   Return a new Metrics object that represents the same registry, with an extra set of default tags.
 
 
-#### Creating metrics
+### Creating metrics
 
 Because collecting metrics will often be in the "fast path" of your server, crow offloads the work of creating and naming metrics into the creation of `Counter`, `Gauge`, and `Distribution` objects. These objects contain the name and tags, and a precomputed key for looking up their current value in the registry. You should create these objects as early as possible, at server initialization time, or when a new session or request is created.
 
@@ -141,8 +142,10 @@ These methods on `Metrics` will create metric objects:
 - `gauge(name: string, tags: Tags = NoTags): Gauge`
 - `distribution(name: string, tags: Tags = NoTags, percentiles?: number[], error?: number): Distribution`
 
+Each of these exposes their `MetricType`, string name, tags, and a formatting function. Check the [source code](../src/crow/metric_name.ts) for more details.
 
-#### Updating metrics
+
+### Updating metrics
 
 These methods on `Metrics` will update a counter, gauge, or distribution:
 
@@ -183,148 +186,193 @@ These methods on `Metrics` will update a counter, gauge, or distribution:
   Time a function call that returns a promise (in microseconds) and record it as a data point in a distribution. Rejected promises are not recorded. This uses the new `perf_hooks` library in nodejs 8.
 
 
-### Registry
+## Registry
 
-The registry is the central coordinator for metrics collection and dispersal. It tracks metrics in a single namespace, and periodically takes a snapshot and sends it to any listeners. (A typical listener might push the metrics into graphite, riemann, influxdb, or prometheus.)
+The registry is the central coordinator for metrics collection and dispersal. It tracks metrics in a single namespace, and periodically takes a snapshot and posts it to any listeners. Listeners may transform the snapshot and/or publish it to an aggregator like graphite, riemann, influxdb, or prometheus.
 
------xxx-----
-  - `new MetricsRegistry(options = {})`
+It's accessible as the `registry` field on a `Metrics` object:
 
-
-
-
-
-Methods:
-
-  - `addObserver(observer)`
-
-    Add an observer. The registry maintains an array of observer objects, and sends a snapshot of the current state to each observer at each interval specified by the period of the registry. For example, if the registry's period is 60000, or 60 seconds, then each observer is invoked once a minute.
-
-    The observers are all expected to be functions that accept one parameter, a snapshot (described below):
-
-      - `function observer(snapshot)`
-
-    A typical observer collects the metrics snapshot and reports it to another service, either by pull (exposing the metrics on a web port) or push (sending them immediately to another server). [Viz](#viz) is an observer that collects an hour of metrics and makes a simple web page summarizing the data.
-
-    Some built-in observers are described in [Observers](#observers).
-
-
-### Snapshot
-
-Each observer receives a `Snapshot` object at a regular interval, which contains the set of metrics being collected and their current values. It's only interesting if you are publishing metrics in a custom way. If you plan to use one of the plugins to publish to InfluxDB, Prometheus, or so on, then you can skip this section.
-
-A snapshot object has these fields:
-
-  - `registry` - a reference back to the [MetricsRegistry](#metricsregistry) that created it
-  - `timestamp` - the current epoch time in milliseconds
-  - `map` - an ES6 `Map` of metric objects to their value at that timestamp
-
-The metrics objects are described below. Each has at least a name, a `Tags` object, and a type. The value may be a number (for gauges and counters) or a `Map` of string names to numbers for a distribution: one for each requested percentile, plus a count and a sum.
-
-The `Tags` object wraps a `Map` of string tag names and values, and provides methods for merging tags and generating a string of their contents. `Snapshot` objects also provide methods to help generate string keys for each metric name and tags. Check out the source for detailed documentation about how to use these objects directly.
-
-The default `flatten()` method will generate a flat `Map` of string keys to numbers, encoding tags in OpenTSDB format, and attaching distribution maps using a "p" tag:
-
-```javascript
-{
-  "bugs": 13,
-  "bugs{module=sickbay}": 8,
-  "request_time_msec{p=0.5}": 9,
-  "request_time_msec{p=0.99}": 32,
-  "request_time_msec{p=count}": 12,
-  "request_time_msec{p=sum}": 549,
-  "heap_used": 14937602
-}
+```
+const metrics = Metrics.create();
+const snapshot = metrics.registry.snapshot();
 ```
 
+Interesting methods on the registry are:
+
+- `stop()`
+
+  Cancel the periodic timer that sends snapshots. Normally you don't need to call this, but if you're concerned about cleanup, or the nodejs VM won't exit cleanly, this may help.
+
+- `snapshot(timestamp: number = Date.now()): Snapshot`
+
+  Manually generate a snapshot of the current value of each metric. Distributions will be reset. This is called internally when posting snapshots events, so is probably only useful for tests.
 
 
-## Observers
+### Events
 
-Observers receive metrics snapshots and either transform them, or forward them to a reporting service (or both). A couple of transforms are included in the library because they're commonly used by reporter plug-ins.
+The `events` field on a registry (also mirrored as an `events` field on each `Metrics` object) is an `EventSource`. Multiple listeners may subscribe to events. For example, to dump each snapshot to the console as it's generated:
+
+```
+const metrics = Metrics.create();
+metrics.events.foreach(snapshot => console.log(snapshot));
+```
+
+The useful methods on `EventSource` are:
+
+- `attach(listener: Listener<A>)`
+
+  Add another listener. A `Listener` is any object with a method `post(item: A)`.
+
+- `forEach(listener: (item: A) => void)`
+
+  Shortcut for adding a listener that just calls a simple function for each item.
+
+- `remove(listener: Listener<A>)`
+
+  Remove a previously-added listener.
+
+- `map<B>(f: (item: A) => B): EventSource<B>`
+
+  Transform each item that's posted, and create a new `EventSource` that posts these transformed items.
+
+- `filter(f: (item: A) => boolean): EventSource<A>`
+
+  Create a new `EventSource` that only posts items where the filter returned `true`.
 
 
-### DeltaObserver
+## Snapshot
 
-Some metrics databases (like prometheus) can track counters and gauges separately, and want to know the type of each metric. Others (like graphite and influxdb) treat all values as gauges, so counters must be turned into instantaneous values before being reported. `DeltaObserver` does that.
+Each `Snapshot` object contains the set of metrics being collected and their current values. It has these fields:
+
+  - `registry` - a reference back to the [Registry](#registry) that created it
+  - `timestamp` - the current epoch time in milliseconds
+  - `map` - an ES6 `Map<MetricName, number>` of metric names to values
+
+`MetricName` is the prototype of `Counter`, `Gauge`, and `Distribution`, so it contains the name, tags, and a function for formatting the name into a string.
+
+Distributions only add gauges to the map, but each gauge will have a `computedFrom` field pointing to the original distribution.
+
+The only interesting method on `Snapshot` is:
+
+- `flatten(formatter?: (name: MetricName) => string): Map<string, number>`
+
+  Return a flattened `Map<string, number>` that converts each `MetricName` into a string, using the provided formatter. The default formatter generates the canonical (OpenTSDB-style) name, like `"name{tag=value,tag=value}"`.
+
+
+## Transforms
+
+Some transforms are included to help convert the format or contents of snapshots before exporting them.
+
+
+### deltaSnapshots
+
+Some metrics databases (like prometheus) can track counters and gauges separately, and want to know the type of each metric. Others (like graphite and influxdb) treat all values as gauges, so counters must be turned into instantaneous values before being reported. `deltaSnapshots` does that.
 
 Each time a snapshot is posted, it compares counters to their values at the previous snapshot, and reports the difference. This turns them into a "value per time unit" metric. For example, a "bugs" counter, reported once a minute, would become a "bugs per minute" gauge.
 
-None of the metric names are altered. The new all-gauge snapshot is sent to the any attached observers.
+None of the metric names are altered. The new all-gauge snapshot is posted as the result of the transform.
 
-  - `new DeltaObserver(options = {})`
+```javascript
+const metrics = Metrics.create();
+metrics.events.map(deltaSnapshots()).forEach(snapshot => ...);
+```
+
+
+### tagDistribution
+
+Sometimes you may want to collate a set of counters into a distribution. For example, you might track errors tagged by the session that generated them:
+
+```javascript
+const errorCounter = metrics.counter("errors", { session: this.sessionId });
+try {
+  ...
+} catch (error) {
+  ...
+  metrics.increment(errorCounter);
+}
+```
+
+If you "rank" the errors by session, you can get a histogram and report the median, 90th percentile, and so on. Since a distribution also includes the sum, it will also contain total errors over the same period.
+
+- `tagDistribution(metrics: Metrics, ...metricMatchers: MetricMatcher[]): Transform<Snapshot, Snapshot>`
+
+Each `MetricMatcher` is an object that will match metrics in a snapshot and generate a new distribution. The possible fields in a `MetricMatcher` are:
+
+- `match: string | RegExp | ((name: MetricName) => boolean)`
+
+  A function that returns true if a metric should be converted, or a regex that will match the name, or an exact name.
+
+- `sortByTags: string[]`
+
+  These tag names will be used to distinguish different samples in the distribution. The distribution will contain any tags from the original counter (or gauge), with these removed.
+
+- `name?: string`
+
+  If present, override the metric name when generating the distribution. (Otherwise it will use the same name as the matched metric.)
+
+- `addTags?: Tags`
+
+  If present, add these tags to the distribution name.
+
+- `percentiles?: number[]`
+
+  If present, override the default percentiles list.
+
+- `error?: number`
+
+  If present, override the default error rank.
+
+For example, this will rank errors by sessionId:
+
+```javascript
+const collateErrors = tagDistribution(metrics, { match: "errors", tags: [ "session" ], name: "errors_per_session" });
+metrics.events.map(collateErrors).forEach(snapshot => ...);
+
+// will be reported as a sample in a new metric "errors_per_session{code=10}":
+metrics.increment(metrics.counter("errors", { session: this.sessionId, code: 10 }));
+```
+
+
+### RingBuffer
+
+A `RingBuffer` is an `EventSource` listener that saves snapshots into a ring buffer for a specified amount of time (one hour, by default). This is used to power [viz](https://www.npmjs.com/package/crow-metrics-viz).
+
+- `new RingBufferObserver(options: RingBufferOptions = {})`
 
 Options:
 
-  - `rank` (array) - described below
+- `span?: number`
 
-Fields and methods:
+  How long should it keep snapshots? The ring buffer will build an array large enough to hold snapshots covering this time period. As new snapshots arrive, ones older than this span will be dropped. The default is one hour (3600 * 1000).
 
-  - `addObserver(observer)` - just like on `MetricsRegistry`
-  - `observer` - function that can be passed as an observer to `MetricsRegistry`
+Methods:
 
-Typical usage:
+- `get(): Snapshot[]`
 
-```javascript
-const registry = new MetricsRegistry(...);
-const d = new DeltaObserver(...);
-registry.addObserver(d);
-d.addObserver(...);
-```
+  Return the current buffer of snapshots, in order from oldest to newest. The array may be empty or short if the buffer has not completely filled yet.
 
-In the process of converting counters to gauges, a DeltaObserver can also collate counters into a distribution. For example, if you're couting errors per session, you might increment a counter like this:
+- `getLatest(): Snapshot`
 
-```javascript
-registry.counter("errors", { session: this.sessionId });
-```
-
-If you then "rank" the errors by session, you can get a histogram and report the median, 90th percentile, and so on. Since a distribution also includes the sum, it will also contain total errors over the same period. To convert tagged metrics into a distribution, you must supply the distinguishing tags, and optionally a new name for the metric. The tagged metrics that are ranked will be omitted from the resulting snapshot.
-
-Each "rank" item is an object with these fields:
-
-  - `match` (string or regex) - The ranking will only apply to metrics with a name that matches.
-  - `tags` (array of string) - These tags will be used to distinguish different samples in the distribution. The distribution will contain any tags from the original counter (or gauge), with these removed.
-  - `name` (optional string) - If this field is present, the distribution will use this name. Otherwise it will preserve the name of the original counter or gauge.
-  - `percentiles` - to override the registry default
-  - `error` - to override the registry default
-
-For example, this DeltaObserver will rank errors by sessionId:
-
-```javascript
-const d = new DeltaObserver({
-  rank: [ { match: "errors", tags: [ "session" ], name: "errors_per_session" } ]
-});
-
-registry.counter("errors", { session: this.sessionId, code: 10 });
-// will be reported as a sample in a new metric "errors_per_session{code=10}"
-```
+  Return the most recent snapshot, if one is available. Throws an error if no snapshots have been posted yet.
 
 
-### RingBufferObserver
+## Exporters
 
-A RingBufferObserver saves snapshots in a ring buffer for a specified amount of time (one hour, by default). This is used to power [viz](#viz).
-
-  - `new RingBufferObserver(options = {})`
-
-Options:
-
-  - `span` (in milliseconds) - The ring buffer will be large enough to hold snapshots from this time period. As new snapshots arrive, ones older than this span will be dropped. The default is one hour (3600 * 1000).
-  - Other options are passed to [DeltaObserver](#deltaobserver).
-
-Fields and methods:
-
-  - `observer` - function that can be passed as an observer to `MetricsRegistry`
-
-  - `getLatest()` - Return the most recent Snapshot object. This may return `null` if no snapshots have arrived yet.
-
-  - `get()` - Return an array of Snapshot objects, from oldest to newest. The array may be empty if no snapshots have arrived yet.
-
-  - `toJson()` - Return a JSON-friendly representation of the ring buffer.
-
-The JSON-friendly representation is an object with metric names for keys (using the default OpenTSDB-style flattened names) and arrays of numbers for values. Distributions are reported as multiple keys, flattened as described in [Snapshot](#snapshot). The numbers are in order from oldest to newest. If a metric wasn't reported for a particular time, the value will be null. An extra field named `@timestamp` contains an array of the corresponding timestamps for the values.
+Several exporters are included to make it easy to forward snapshots to aggregators. More may be included in the future.
 
 
-## Built-in plugins
+### exportInfluxDb
+
+### exportPrometheus
+
+
+
+
+
+
+
+
+
 
 ### InfluxDB
 
@@ -379,45 +427,3 @@ Counters and gauges are reported as-is, and distribution quantiles are reported 
   - `prometheusExporter(express, registry)`
 
     Make a new `PrometheusObserver`, attach it to the given registry, and return an express handler that will respond to requests with a prometheus-style document of metrics.
-
-
-### Viz
-
-For local debugging, sanity checking -- or simply because it's pretty -- you may want to provide a web display of metrics for your server.
-
-Viz attaches a [RingBufferObserver](#ringbufferobserver) to your registry, which collects metrics over a rolling window (one hour, by default), and graphs this data with [peity](http://benpickles.github.io/peity/).
-
-<img src="https://raw.githubusercontent.com/robey/node-crow/master/docs/crow-screenshot.png">
-
-There are two ways to construct the service:
-
-  - `viz(express, registry, options)`
-
-    Create an express handler that will respond to a path with the viz interface. This is useful if your server is already using express for other requests.
-
-      - `express` - the express module or a compatible one
-      - `registry` - a crow [MetricsRegistry](#metricsregistry)
-      - `options` - are passed to [RingBufferObserver](#ringbufferobserver) directly
-
-    For example:
-
-    ```javascript
-    var app = express();
-    app.use("/admin/viz", crow.viz(express, registry));
-    ```
-
-  - `startVizServer(express, registry, port = 8080, options = {})`
-
-    Start up the viz site on a devoted port with a new instance of the express (or compatible) server.
-
-    For example:
-
-    ```javascript
-    var crow = require("crow-metrics");
-    var express = require("express");
-
-    var metrics = new crow.MetricsRegistry();
-    crow.startVizServer(express, metrics, 9090);
-    ```
-
-    This will create a page at `http://localhost:9090/`.
