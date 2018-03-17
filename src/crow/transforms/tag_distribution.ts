@@ -1,3 +1,4 @@
+import { Transform } from "../events";
 import { Distribution, MetricName, MetricType, Tags, tagsToMap } from "../metric_name";
 import { Metrics } from "../metrics";
 import { Snapshot } from "../snapshot";
@@ -15,7 +16,7 @@ export interface MetricMatcher {
   // if present, override the metric name.
   name?: string;
 
-  // if present, add this tag to the distribution name.
+  // if present, add these tags to the distribution name.
   addTags?: Tags;
 
   // if present, override the default percentiles list.
@@ -51,7 +52,7 @@ class Matcher {
  *
  *     registry.events.map(tagDistribution(metrics, [ ... ])).forEach(snapshot => ...);
  */
-export function tagDistribution(metrics: Metrics, ...metricMatchers: MetricMatcher[]) {
+export function tagDistribution(metrics: Metrics, ...metricMatchers: MetricMatcher[]): Transform<Snapshot, Snapshot> {
   const newDistributions = new Map<string, Distribution>();
 
   const matchers = metricMatchers.map(m => {
