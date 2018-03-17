@@ -117,7 +117,7 @@ The primary interface for creating and updating metrics is `Metrics`. Each `Metr
 
 A "child" `Metrics` object can be created that prefixes all metric names with a string, or attaches a default set of tags. This can be useful for handing to a sub-module, like a session or a database manager. For example, to attach an instance ID to every metric, and prefix them with `"db_"`:
 
-```
+```javascript
 const newMetrics = metrics.withTags({ instanceId: this.instanceId }).withPrefix("db_");
 ```
 
@@ -192,7 +192,7 @@ The registry is the central coordinator for metrics collection and dispersal. It
 
 It's accessible as the `registry` field on a `Metrics` object:
 
-```
+```javascript
 const metrics = Metrics.create();
 const snapshot = metrics.registry.snapshot();
 ```
@@ -212,7 +212,7 @@ Interesting methods on the registry are:
 
 The `events` field on a registry (also mirrored as an `events` field on each `Metrics` object) is an `EventSource`. Multiple listeners may subscribe to events. For example, to dump each snapshot to the console as it's generated:
 
-```
+```javascript
 const metrics = Metrics.create();
 metrics.events.foreach(snapshot => console.log(snapshot));
 ```
@@ -363,32 +363,16 @@ Several exporters are included to make it easy to forward snapshots to aggregato
 
 ### exportInfluxDb
 
-### exportPrometheus
+[InfluxDB](https://influxdb.com/) expects to receive an HTTP `POST` containing a summary of metrics from each server at a regular interval.
 
-
-
-
-
-
-
-
-
-
-### InfluxDB
-
-[InfluxDB](https://influxdb.com/), like Graphite, expects to receive a `POST` containing a summary of metrics from each server at a regular interval.
-
-The influx observer receives each snapshot as it's computed, formats it into a document in InfluxDB format, and posts it to the configured host. You must provide the `request` module, or a module with a similar interface.
+The InfluxDB exporter receives each snapshot as it's computed, formats it into a document in InfluxDB format, and posts it to the configured host.
 
 ```javascript
-const crow = require("crow-metrics");
-const request = require("request");
-
-const registry = new crow.MetricsRegistry();
-crow.exportInflux(registry, request, { hostname: "my.influx.server:8086", database: "mydb" });
+const metrics = Metrics.create();
+exportInfluxDb(metrics.events, { hostname: "my.influx.server:8086", database: "mydb" });
 ```
 
-  - `exportInflux(registry, request, options = {})`
+- `exportInfluxDb(events: EventSource<Snapshot>, options: ExportInfluxDbOptions = {})`
 
 Options:
 
@@ -397,33 +381,31 @@ Options:
   - `url` - use a custom url, instead of `http://(hostname)/write?db=(database)` (overrides `hostname` and `database` options)
   - `timeout` (in milliseconds) - how long to wait before giving up (default is 5000, or five seconds)
   - `log` - bunyan-style log for reporting errors
-  - `rank` - passed to [DeltaObserver](#deltaobserver)
+  - `fieldName` - to use a field name other than "value"
 
 
-### Prometheus
+### exportPrometheus
 
 [Prometheus](http://prometheus.io/) polls servers at a regular interval, expecting periodic metric summaries to be available via HTTP.
 
-The prometheus observer attaches to any existing [express](http://expressjs.com/) app, and provides the prometheus text format:
+The prometheus exporter transforms a snapshot into a document of the form prometheus wants. You can host this document on your own internal HTTP server, or use [viz](https://www.npmjs.com/package/crow-metrics-viz) to host it.
+
+To host it yourself, you can do something like this:
 
 ```javascript
-const crow = require("crow-metrics");
-const express = require("express");
+let lastDocument: string = "";
+metrics.events.map(exportPrometheus).forEach(document => {
+  lastDocument = document;
+});
 
-const registry = new crow.MetricsRegistry();
 const app = express();
-app.use("/metrics", crow.prometheusExporter(express, registry));
+app.get("/metrics", (request, response) => {
+  response.set("Content-Type", "text/plain; version=0.0.4");
+  response.send(lastDocument);
+});
 app.listen(9090);
 ```
 
-The above code creates an HTTP server that provides a metrics summary to prometheus on `http://(localhost):9090/metrics`. The summary is updated periodically as configured by the [MetricsRegistry](#metricsregistry) interval.
+The above code creates an HTTP server that provides a metrics summary to prometheus on `http://(localhost):9090/metrics`.
 
-Counters and gauges are reported as-is, and distribution quantiles are reported as "summary" quantiles, in the format prometheus expects.
-
-  - `new PrometheusObserver()`
-
-    Create a new observer that can be added to a [MetricsRegistry](#metricsregistry), like `registry.addObserver(prometheusObserver.observer);`.
-
-  - `prometheusExporter(express, registry)`
-
-    Make a new `PrometheusObserver`, attach it to the given registry, and return an express handler that will respond to requests with a prometheus-style document of metrics.
+Counters and gauges are reported as-is, and distribution quantiles are reported as "summary" quantiles.
