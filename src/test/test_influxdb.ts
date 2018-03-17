@@ -24,7 +24,12 @@ describe("exportInfluxDb", () => {
 
 
   it("reports empty metrics", async () => {
-    exportInfluxDb(m.events, { hostname: "influxdb.dev.example.com:8086", database: "wut", timeout: 500, httpPost });
+    m.events.attach(exportInfluxDb({
+      hostname: "influxdb.dev.example.com:8086",
+      database: "wut",
+      timeout: 500,
+      httpPost,
+    }));
     m.registry.publish();
     saved.length.should.eql(1);
     saved[0].should.eql({
@@ -34,7 +39,7 @@ describe("exportInfluxDb", () => {
   });
 
   it("reports actual metrics", () => {
-    exportInfluxDb(m.events, { httpPost });
+    m.events.attach(exportInfluxDb({ httpPost }));
     m.increment(m.counter("tickets"), 5);
     m.setGauge(m.gauge("speed", { vessel: "sailboat" }), 100);
     m.addDistribution(m.distribution("bugs"), 20);

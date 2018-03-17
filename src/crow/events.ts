@@ -1,5 +1,6 @@
 export type Transform<A, B> = (item: A) => B;
 export type Filter<A> = (item: A) => boolean;
+export type Handler<A> = (item: A) => void;
 
 export interface Listener<A> {
   post(item: A): void;
@@ -22,8 +23,8 @@ export class EventSource<A> {
     this.listeners.add(listener);
   }
 
-  forEach(listener: (item: A) => void) {
-    this.attach({ post(item) { listener(item) } });
+  forEach(handler: Handler<A>) {
+    this.attach({ post(item) { handler(item) } });
   }
 
   remove(listener: Listener<A>) {

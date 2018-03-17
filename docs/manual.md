@@ -369,7 +369,7 @@ The InfluxDB exporter receives each snapshot as it's computed, formats it into a
 
 ```javascript
 const metrics = Metrics.create();
-exportInfluxDb(metrics.events, { hostname: "my.influx.server:8086", database: "mydb" });
+metrics.events.attach(exportInfluxDb({ hostname: "my.influx.server:8086", database: "mydb" }));
 ```
 
 - `exportInfluxDb(events: EventSource<Snapshot>, options: ExportInfluxDbOptions = {})`

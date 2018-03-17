@@ -33,7 +33,7 @@ const webService = express();
 const metrics = crow.Metrics.create({ period: 60000 });
 
 // publish metrics to InfluxDB.
-crow.exportInfluxDb(metrics.events, { hostname: "influxdb.prod.example.com:8086", database: "prod" });
+metrics.events.attach(crow.exportInfluxDb({ hostname: "influxdb.prod.example.com:8086", database: "prod" }));
 
 // track heap-used as a gauge.
 // the function will be called on-demand, once a minute.
