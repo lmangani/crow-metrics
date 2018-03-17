@@ -37,7 +37,6 @@ export class RingBuffer implements Listener<Snapshot> {
   }
 
   get(): Snapshot[] {
-    if (this.buffer == null) return [];
     const rv: Snapshot[] = [];
     for (let i = 0; i < this.size; i++) {
       const record = this.buffer[(this.index + i) % this.size];
@@ -47,7 +46,6 @@ export class RingBuffer implements Listener<Snapshot> {
   }
 
   getLatest(): Snapshot {
-    if (this.buffer == null) throw new Error("No snapshots yet");
     return this.buffer[(this.index + this.size - 1) % this.size];
   }
 }
