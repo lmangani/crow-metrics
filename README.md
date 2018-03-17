@@ -57,15 +57,40 @@ webService.get("/", function (request, response) {
 
 ## How does it work?
 
-Metrics are collected in a `Registry` (usually there is only one). On a configurable period, these metrics are summarized and sent to listeners. The listeners can push the summary to a push-based service like Graphite, or post the results to a web service for a poll-based service like Prometheus.
+Metrics consist of counters, gauges, and distributions, all described in [the API documentation](./docs/manual.md). They're defined and collected in a `Registry` (usually there is only one). On a configurable period, these metrics are summarized and sent to listeners. The listeners can push the summary to a push-based service like Graphite, or post the results to a web service for a poll-based service like Prometheus.
 
------xxx----- FIXME link to manual.md
-Metrics consist of:
+In the example above:
 
-  - **counters**: numbers that increase only (never decrease), like the number of requests handled since the server started.
-  - **gauges**: dials that measure a changing state, like the number of currently open connections, or the amount of memory being used.
-  - **distributions**: samples that are interesting for their histogram, like timings (95th percentile of database reads, for example).
+```javascript
+const metrics = crow.Metrics.create({ period: 60000 });
+```
 
+creates a new registry, and a `Metrics` object to create and update metrics.
+
+```javascript
+const heapUsed = metrics.gauge("heap_used");
+const requestCount = metrics.counter("request_count");
+const requestTime = metrics.distribution("request_time_msec");
+```
+
+These lines define metrics, creating a `Gauge`, `Counter`, and `Distribution` object, each with optional tags. Updating a counter then becomes the single line:
+
+```javascript
+metrics.increment(requestCount);
+```
+
+The collected metrics are pushed once per minute into the `events` object, so this line attaches a listener that will post those results to an influxDB instance:
+
+```javascript
+crow.exportInfluxDb(metrics.events, { hostname: "influxdb.prod.example.com:8086", database: "prod" });
+```
+
+Check out [the API documentation](./docs/manual.md) for more details.
+
+
+## Requirements
+
+The code is written in typescript and compiled into ES7, using async/await and the "perf_tools" module for microsecond-level timing, so it requires at least nodejs 8.
 
 
 ## License
@@ -76,10 +101,3 @@ Apache 2 (open-source) license, included in `LICENSE.txt`.
 ## Authors
 
 @robey - Robey Pointer <robeypointer@gmail.com>
-
-
-
-
-## FIXME
-
-- mention node 8 requirement for async/await and perf timings
