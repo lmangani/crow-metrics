@@ -7,8 +7,8 @@ This manual is meant to cover every aspect of a fairly tiny library. The section
     - [Distributions](#distributions)
 - [API](#api)
 - [Metrics](#metrics)
-    - [Options](options)
-    - [Adding tags or a prefix](adding-tags-or-a-prefix)
+    - [Options](#options)
+    - [Adding tags or a prefix](#adding-tags-or-a-prefix)
     - [Creating metrics](#creating-metrics)
     - [Updating metrics](#updating-metrics)
 - [Registry](#registry)
@@ -18,7 +18,7 @@ This manual is meant to cover every aspect of a fairly tiny library. The section
     - [deltaSnapshots](#deltasnapshots)
     - [tagDistribution](#tagdistribution)
     - [RingBuffer](#ringbuffer)
-- [Exporters]
+- [Exporters](#exporters)
     - [exportInfluxDb](#exportinfluxdb)
     - [exportPrometheus](#exportprometheus)
 
