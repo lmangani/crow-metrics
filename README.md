@@ -82,7 +82,7 @@ metrics.increment(requestCount);
 The collected metrics are pushed once per minute into the `events` object, so this line attaches a listener that will post those results to an influxDB instance:
 
 ```javascript
-crow.exportInfluxDb(metrics.events, { hostname: "influxdb.prod.example.com:8086", database: "prod" });
+metrics.events.attach(crow.exportInfluxDb({ hostname: "influxdb.prod.example.com:8086", database: "prod" }));
 ```
 
 Check out [the API documentation](./docs/manual.md) for more details.
