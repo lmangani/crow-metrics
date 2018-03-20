@@ -38,17 +38,17 @@ metrics.events.attach(crow.exportInfluxDb({ hostname: "influxdb.prod.example.com
 // track heap-used as a gauge.
 // the function will be called on-demand, once a minute.
 const heapUsed = metrics.gauge("heap_used");
-metrics.setGauge(heapUsed, function () { return process.memoryUsage().heapUsed; });
+metrics.setGauge(heapUsed, () => process.memoryUsage().heapUsed);
 
 // my website.
 const requestCount = metrics.counter("request_count");
 const requestTime = metrics.distribution("request_time_msec");
-webService.get("/", function (request, response) {
+webService.get("/", (request, response) => {
   // count incoming requests:
   metrics.increment(requestCount);
 
   // time how long it takes to respond:
-  metrics.time(requestTime, function () {
+  metrics.time(requestTime, () => {
     response.send("Hello!\n");
   });
 });
