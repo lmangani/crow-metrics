@@ -32,10 +32,13 @@ export abstract class MetricName {
     public type: MetricType,
     public name: string,
     public tags: Map<string, string>,
+    // some exporters (like influx) give each name a sub-name
+    public fieldName?: string,
     // is this a manufactured gauge based on a distribution?
     public computedFrom?: MetricName
   ) {
     this.canonical = this.format();
+    if (fieldName) this.canonical += ":" + fieldName;
   }
 
   /*
@@ -63,14 +66,14 @@ export function tagsToMap(baseTags: Tags, tags: Tags = NoTags): Map<string, stri
 
 
 export class Counter extends MetricName {
-  constructor(name: string, baseTags: Tags, tags: Tags) {
-    super(MetricType.Counter, name, tagsToMap(baseTags, tags));
+  constructor(name: string, baseTags: Tags, tags: Tags, fieldName?: string) {
+    super(MetricType.Counter, name, tagsToMap(baseTags, tags), fieldName);
   }
 }
 
 export class Gauge extends MetricName {
-  constructor(name: string, baseTags: Tags, tags: Tags, computedFrom?: MetricName) {
-    super(MetricType.Gauge, name, tagsToMap(baseTags, tags), computedFrom);
+  constructor(name: string, baseTags: Tags, tags: Tags, fieldName?: string, computedFrom?: MetricName) {
+    super(MetricType.Gauge, name, tagsToMap(baseTags, tags), fieldName, computedFrom);
   }
 }
 
@@ -84,11 +87,12 @@ export class Distribution extends MetricName {
     baseTags: Tags,
     tags: Tags,
     public percentiles: number[],
-    public error: number
+    public error: number,
+    fieldName?: string,
   ) {
-    super(MetricType.Distribution, name, tagsToMap(baseTags, tags));
-    this.percentileGauges = percentiles.map(p => new Gauge(this.name, this.tags, { p: p.toString() }, this));
-    this.countGauge = new Gauge(this.name, this.tags, { p: "count" }, this);
-    this.sumGauge = new Gauge(this.name, this.tags, { p: "sum" }, this);
+    super(MetricType.Distribution, name, tagsToMap(baseTags, tags), fieldName);
+    this.percentileGauges = percentiles.map(p => new Gauge(this.name, this.tags, { p: p.toString() }, fieldName, this));
+    this.countGauge = new Gauge(this.name, this.tags, { p: "count" }, fieldName, this);
+    this.sumGauge = new Gauge(this.name, this.tags, { p: "sum" }, fieldName, this);
   }
 }

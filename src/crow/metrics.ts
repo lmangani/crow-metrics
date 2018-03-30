@@ -31,8 +31,8 @@ export class Metrics {
   /*
    * Create a counter with the given name and optional tags.
    */
-  counter(name: string, tags: Tags = NoTags): Counter {
-    const rv = new Counter(this.prefix + name, this.tags, tags);
+  counter(name: string, tags: Tags = NoTags, fieldName?: string): Counter {
+    const rv = new Counter(this.prefix + name, this.tags, tags, fieldName);
     this.registry.getOrMake(rv);
     return rv;
   }
@@ -40,8 +40,8 @@ export class Metrics {
   /*
    * Create a gauge with the given name and optional tags.
    */
-  gauge(name: string, tags: Tags = NoTags): Gauge {
-    const rv = new Gauge(this.prefix + name, this.tags, tags);
+  gauge(name: string, tags: Tags = NoTags, fieldName?: string): Gauge {
+    const rv = new Gauge(this.prefix + name, this.tags, tags, fieldName);
     this.registry.getOrMake(rv);
     return rv;
   }
@@ -53,9 +53,10 @@ export class Metrics {
     name: string,
     tags: Tags = NoTags,
     percentiles: number[] = this.registry.percentiles,
-    error: number = this.registry.error
+    error: number = this.registry.error,
+    fieldName?: string
   ): Distribution {
-    const rv = new Distribution(this.prefix + name, this.tags, tags, percentiles, error);
+    const rv = new Distribution(this.prefix + name, this.tags, tags, percentiles, error, fieldName);
     this.registry.getOrMake(rv);
     return rv;
   }
