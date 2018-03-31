@@ -12,6 +12,8 @@ On a period of your choosing (for example, minutely) these metrics are summarize
 
 The goal of crow is to make it *dead simple* to collect and report these metrics, and to motivate you to add them everywhere!
 
+To have your server also serve up a little webpage of graphs, check out [crow-metrics-viz](https://www.npmjs.com/package/crow-metrics-viz).
+
 (\*) Servo? Crow? _Get it?_ Ha ha ha.
 
 - [Example](#example)
