@@ -138,11 +138,13 @@ Because collecting metrics will often be in the "fast path" of your server, crow
 
 These methods on `Metrics` will create metric objects:
 
-- `counter(name: string, tags: Tags = NoTags): Counter`
-- `gauge(name: string, tags: Tags = NoTags): Gauge`
-- `distribution(name: string, tags: Tags = NoTags, percentiles?: number[], error?: number): Distribution`
+- `counter(name: string, tags: Tags = NoTags, fieldName?: string): Counter`
+- `gauge(name: string, tags: Tags = NoTags, fieldName?: string): Gauge`
+- `distribution(name: string, tags: Tags = NoTags, percentiles?: number[], error?: number, fieldName?: string): Distribution`
 
 Each of these exposes their `MetricType`, string name, tags, and a formatting function. Check the [source code](../src/crow/metric_name.ts) for more details.
+
+The optional `fieldName` may be used to distinguish two different metrics with the same name and tags, and will be used in some exporters (like InfluxDB) as the descriptive name of the exported value.
 
 
 ### Updating metrics
@@ -381,7 +383,7 @@ Options:
   - `url` - use a custom url, instead of `http://(hostname)/write?db=(database)` (overrides `hostname` and `database` options)
   - `timeout` (in milliseconds) - how long to wait before giving up (default is 5000, or five seconds)
   - `log` - bunyan-style log for reporting errors
-  - `fieldName` - to use a field name other than "value"
+  - `fieldName` - to use a default field name other than "value"
 
 
 ### exportPrometheus

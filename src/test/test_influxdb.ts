@@ -59,4 +59,34 @@ describe("exportInfluxDb", () => {
       ``
     ]);
   });
+
+  it("uses optional field name", () => {
+    m.events.attach(exportInfluxDb({ httpPost, fieldName: "v" }));
+    m.increment(m.counter("tickets"), 5);
+    m.increment(m.counter("tickets", {}, "count"), 7);
+    m.setGauge(m.gauge("speed", { vessel: "sailboat" }), 100);
+    m.setGauge(m.gauge("speed", { vessel: "sailboat" }, "count"), 200);
+    m.addDistribution(m.distribution("bugs"), 20);
+    m.addDistribution(m.distribution("bugs", {}, [ 0.5 ], 0.01, "swarm"), 25);
+    m.registry.publish();
+
+    saved.length.should.eql(1);
+    const timestamp = saved[0].text.split("\n")[1].split(" ")[2];
+    (Date.now() - (parseInt(timestamp, 10) / 1000000)).should.be.lessThan(1000);
+    saved[0].text.split("\n").slice(1).should.eql([
+      `tickets v=5 ${timestamp}`,
+      `tickets count=7 ${timestamp}`,
+      `speed,vessel=sailboat v=100 ${timestamp}`,
+      `speed,vessel=sailboat count=200 ${timestamp}`,
+      `bugs,p=0.5 v=20 ${timestamp}`,
+      `bugs,p=0.9 v=20 ${timestamp}`,
+      `bugs,p=0.99 v=20 ${timestamp}`,
+      `bugs,p=count v=1 ${timestamp}`,
+      `bugs,p=sum v=20 ${timestamp}`,
+      `bugs,p=0.5 swarm=25 ${timestamp}`,
+      `bugs,p=count swarm=1 ${timestamp}`,
+      `bugs,p=sum swarm=25 ${timestamp}`,
+      ``
+    ]);
+  });
 });
