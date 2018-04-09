@@ -21,7 +21,7 @@ export interface ExportInfluxDbOptions {
   // how long to wait on each POST before giving up (msec)
   timeout?: number;
   
-  // precision of timestamp sent with POST (s)
+  // precision of timestamp sent with POST (ns,u,µ,ms,s,m,h)
   precision?: string;
 
   // bunyan-style log for reporting errors
@@ -46,7 +46,7 @@ export interface ExportInfluxDbOptions {
 export function exportInfluxDb(options: ExportInfluxDbOptions = {}): Listener<Snapshot> {
   const hostname = options.hostname || DEFAULT_HOSTNAME;
   const database = options.database || DEFAULT_DATABASE;
-  const precision = options.precision || "s";
+  const precision = options.precision || "ms";
   const postUrl = ( options.url || `http://${hostname}/write?db=${database}`) + `&precision=${precision}`;
   const timeout = options.timeout || 5000;
   const defaultFieldName = options.fieldName || "value";
